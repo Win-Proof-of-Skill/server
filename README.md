@@ -1,14 +1,21 @@
-# Liberdus
+# Win Proof of Skill (WIN-PSKILL)
 
-## Introduction 
+**Website:** [win-pskill.com](https://win-pskill.com)
 
-Liberdus is a payment network and the first application to be built with the Shardus distributed ledger framework. We are building this payment network to enable people to govern their own money; and as a result, participate in a more fair and sustainable economy.
+## Introduction
 
-For millennia, money has existed in some form or another. Money has made it easy for individuals, governments, and businesses to transact with one another. Over time, our money has evolved and gone through many different forms: metal, paper, and now even digital. During the same timeframe in the western world, our governments have evolved from feudal, totalitarian states, to more and more democratic forms of government. However, our money and its rules remain relatively un-democratic. But… We believe it can be different. 
+Win Proof of Skill is a network built around one idea: rewards should go to people who can demonstrate real ability. Instead of rewarding capital or raw computing power, the network lets participants prove their skill and win based on merit, with the rules enforced transparently on a distributed ledger.
 
-The Liberdus team believes a more democratic form of money can be achieved with the use of distributed ledger technologies and an on-chain governance system – so that every decision about the rules of the money is made by the people who use it. This is what the Liberdus project aims to achieve.
+The project runs on the [Shardus](https://github.com/shardeum/shardus-global-server) distributed ledger framework, which gives it linear scalability: the network gets more capacity as more nodes join, with fast transaction processing and low fees.
 
-For more info, please checkout our [Whitepaper](https://liberdus.com/Liberdus-Whitepaper-19.10.19.pdf)
+## Fork Notice
+
+Win Proof of Skill is a **fork of [Liberdus](https://github.com/Liberdus/server)**, the payment network and first application built on Shardus. We are grateful to the Liberdus team for the foundation this project builds on, including the account model, transaction handling, networking, and tooling.
+
+- Upstream project: [Liberdus/server](https://github.com/Liberdus/server)
+- Liberdus whitepaper: [Liberdus Whitepaper](https://liberdus.com/Liberdus-Whitepaper-19.10.19.pdf)
+
+Win Proof of Skill is an independent project. It is not affiliated with or endorsed by the Liberdus team, and changes made here do not necessarily reflect Liberdus's goals or roadmap. Original copyright and license notices from upstream are retained.
 
 ## Installation
 
@@ -22,23 +29,25 @@ For more info, please checkout our [Whitepaper](https://liberdus.com/Liberdus-Wh
    ```bash
    sudo apt-get install -y build-essential libssl-dev pkg-config
    ```
-3. **Rust 1.82** – [rustup](https://www.rust-lang.org/tools/install):
+3. **Rust 1.82**, installed with [rustup](https://www.rust-lang.org/tools/install):
    ```bash
    rustup default 1.82
    ```
-   Or install the latest Rust and use `rustup default 1.82` if you need this exact version.
 4. **npm** (included with Node.js; update with `npm install -g npm` if needed)
-5. **Shardus CLI**: `npm install -g shardus@4.3.1`
+5. **Shardus CLI**:
+   ```bash
+   npm install -g shardus@4.3.1
+   ```
 
 ### Clone, install, and run (quick start)
 
 ```bash
-git clone https://github.com/Liberdus/server.git
-cd server
+git clone <YOUR-WIN-PSKILL-REPO-URL> win-pskill
+cd win-pskill
 npm install
 ```
 
-**Start the network** (e.g. with 10 nodes):
+**Start a local network** (for example, with 10 nodes):
 
 ```bash
 shardus create 10
@@ -57,91 +66,100 @@ shardus clean
 rm -rf instances
 ```
 
-### For demos, testing, etc.
+### For demos and testing
 
-1. Clone this repository with `git clone https://gitlab.com/liberdus/server.git`
-2. Checkout the `dist` branch with `git checkout dist`
-3. Install dependencies with `npm i`
-4. Compile with `npm run compile`
+1. Clone this repository.
+2. Check out the `dist` branch: `git checkout dist`
+3. Install dependencies: `npm i`
+4. Compile: `npm run compile`
 
-### For Liberdus/Shardus development:
+### For Shardus-level development
 
-1. Ensure you have access to [`shardus-global-server`](https://gitlab.com/shardus/global/shardus-global-server)
-2. Make sure your git installation is set to cache credentials with `git config --global credential.helper cache`
-3. Force git to prompt for credentials by cloning [`shardus-global-server`](https://gitlab.com/shardus/global/shardus-global-server):  
-   `git clone https://gitlab.com/shardus/global/shardus-global-server.git`
-4. In another directory, clone this repository with `git clone https://gitlab.com/liberdus/server.git`
-5. Install dependencies with `npm i`
-6. Compile with `npm run compile`
+1. Ensure you have access to [`shardus-global-server`](https://gitlab.com/shardus/global/shardus-global-server).
+2. Make sure git caches credentials: `git config --global credential.helper cache`
+3. Clone `shardus-global-server` to force git to prompt for credentials.
+4. In another directory, clone this repository.
+5. Install dependencies: `npm i`
+6. Compile: `npm run compile`
 
 ## Usage
 
-- **Start a network:** `shardus create {# of nodes}` (e.g. `shardus create 10`) – starts local Liberdus nodes and apps.
-- **Stop the network:** `shardus stop` – stops all nodes and apps.
-- **Clean the network:** `shardus clean` – cleans residual files and folders from archiver and monitor-server. Then run `rm -rf instances` to remove the `instances` folder so you can start a fresh network.
+| Command | Description |
+| --- | --- |
+| `shardus create {# of nodes}` | Start a local network of nodes and supporting apps (e.g. `shardus create 10`) |
+| `shardus stop` | Stop all nodes and apps |
+| `shardus clean` | Clean residual files from the archiver and monitor server; then run `rm -rf instances` for a fresh start |
 
-[Shardus Monitor](https://gitlab.com/shardus/monitor-server) - http://localhost:3000
-[Liberdus Client](https://gitlab.com/liberdus/web-client/liberdus-web-client) - http://localhost:3333
-[Archive Server](https://gitlab.com/shardus/archive/archive-server) - http://localhost:4000
-[Liberdus Explorer](https://gitlab.com/liberdus/explorer-server) - http://localhost:4444
+Local services started with the network:
 
-### Interacting with the network via client.js
+| Service | URL |
+| --- | --- |
+| Shardus Monitor | http://localhost:3000 |
+| Web Client | http://localhost:3333 |
+| Archive Server | http://localhost:4000 |
+| Explorer | http://localhost:4444 |
 
-Run the client script to connect to a node and interact with the network:
+### Interacting with the network via `client.js`
+
+Connect to a node and interact with the network:
 
 ```bash
 node client.js localhost:9002
 ```
 
-Replace `localhost:9002` with the host and port of any node in your network (e.g. `localhost:9001`, `localhost:9003`).
-
-**For detailed instructions on how to play around** (creating accounts, registering, transfers, messages between two accounts, and using the HTTP API), see the comment block at the top of **`client.js`**.
+Replace `localhost:9002` with the host and port of any node in your network (e.g. `localhost:9001`, `localhost:9003`). See the comment block at the top of `client.js` for detailed instructions on creating accounts, registering, transfers, messages, and using the HTTP API.
 
 ### Creating a key pair for testing
 
-Create a public/private key pair and add the **public key** to the server config so you can use the client for testing:
-
 1. Generate a key pair:
 
-```bash
-node -e "
-const crypto = require('@shardus/lib-crypto-utils');
-crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc');
-const pair = crypto.generateKeypair();
-console.log('PUBLIC_KEY:', pair.publicKey);
-console.log('SECRET_KEY:', pair.secretKey);
-" 2>&1
-```
+   ```bash
+   node -e "
+   const crypto = require('@shardus/lib-crypto-utils');
+   crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc');
+   const pair = crypto.generateKeypair();
+   console.log('PUBLIC_KEY:', pair.publicKey);
+   console.log('SECRET_KEY:', pair.secretKey);
+   " 2>&1
+   ```
 
 2. Add the **PUBLIC_KEY** to `src/config/index.ts` in the `devPublicKeys` object (and `multisigKeys` if needed) with `DevSecurityLevel.High`.
 
-3. Set environment variables for the client script (use the values from step 1):
+3. Set environment variables for the client script:
+   - `DEV_PUBLIC_KEY`: your public key
+   - `DEV_PRIVATE_KEY`: your secret key
 
-   - `DEV_PUBLIC_KEY` – your public key  
-   - `DEV_PRIVATE_KEY` – your secret key  
+Then run `node client.js localhost:9002`.
 
-Then run `node client.js localhost:9002` to interact with the network.
+### Querying a node via HTTP
 
-### Querying the node via HTTP (account, transactions, chatId / messages)
+You can query any node directly with a browser or `curl`.
 
-You can query account data, transactions, and messages directly from any node using HTTP (e.g. in a browser or with `curl`).
-
-- **Account** – get account info by account ID (address):
+- **Account** (by account ID / address):
   ```bash
-  curl "http://localhost:9002/account/7e79d53c067e9d0a095c9675db38330ec72ffd5b000000000000000000000000"
+  curl "http://localhost:9002/account/<ACCOUNT_ID>"
   ```
-  Replace the long hex string with the account ID (public key / address) you want to look up.
 
-- **Account transactions** – list transactions for an account:
+- **Account transactions:**
   ```bash
-  curl "http://localhost:9004/account/f43eb22eb9ca0afe5f0fc620ba1ac932711eefe000000000000000000000000/transactions"
+  curl "http://localhost:9004/account/<ACCOUNT_ID>/transactions"
   ```
-  Use your node host/port and the account ID.
 
-- **Messages (chat)** – get messages for a chat; the **chatId** is the first path segment after `/messages/`:
+- **Messages (chat).** The chatId is the first path segment after `/messages/`:
   ```bash
-  curl "http://localhost:9002/messages/7569adbc2fd289d0e613eb488c7968988c41a5d8c2a1e1c4c038038d7c957955/0"
+  curl "http://localhost:9002/messages/<CHAT_ID>/0"
   ```
-  The response is JSON with a `messages` array; each message includes `chatId`, `from`, `message` (body/handle/timestamp), and signature fields. The chatId is derived from the two participants’ addresses (sorted and hashed). You can obtain it from the client when using `message poll <alias>` or from a previous message response.
+  The response is JSON with a `messages` array. The chatId is derived from the two participants' addresses (sorted and hashed), and can be obtained from the client with `message poll <alias>`.
 
+## Contributing
 
+Issues and pull requests are welcome. If a fix or feature is relevant to the shared codebase, please consider contributing it upstream to [Liberdus/server](https://github.com/Liberdus/server) as well.
+
+## Links
+
+- Website: [win-pskill.com](https://win-pskill.com)
+- Upstream (Liberdus): [github.com/Liberdus/server](https://github.com/Liberdus/server)
+
+## License
+
+This project inherits the license of the upstream Liberdus repository. See the `LICENSE` file for details.
