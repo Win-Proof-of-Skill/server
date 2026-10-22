@@ -66,8 +66,8 @@ export const validate_fields = (
   }
   // Not redundant with the graceDuration check in validate(): that bounds the request by a DAO
   // parameter governance can raise, so it is a policy limit. This is the actual upper bound.
-  if (tx.gracePeriod !== undefined && tx.gracePeriod > config.LiberdusFlags.daoMaxProposalGracePeriodMs) {
-    response.reason = `tx "gracePeriod" (${tx.gracePeriod}ms) exceeds the maximum of ${config.LiberdusFlags.daoMaxProposalGracePeriodMs}ms`
+  if (tx.gracePeriod !== undefined && tx.gracePeriod > config.WinFlags.daoMaxProposalGracePeriodMs) {
+    response.reason = `tx "gracePeriod" (${tx.gracePeriod}ms) exceeds the maximum of ${config.WinFlags.daoMaxProposalGracePeriodMs}ms`
     return response
   }
   if (typeof tx.title !== 'string' || tx.title.trim().length === 0 || tx.title.length > 100) {
@@ -94,8 +94,8 @@ export const validate_fields = (
   }
   // Offset measured from tx.timestamp rather than Date.now(), so nodes validating at different
   // moments still reach the same verdict.
-  if (tx.startTime !== undefined && tx.startTime - tx.timestamp > config.LiberdusFlags.daoMaxProposalStartDelayMs) {
-    response.reason = `tx "startTime" (${tx.startTime}) is more than ${config.LiberdusFlags.daoMaxProposalStartDelayMs}ms after the creation time (${tx.timestamp})`
+  if (tx.startTime !== undefined && tx.startTime - tx.timestamp > config.WinFlags.daoMaxProposalStartDelayMs) {
+    response.reason = `tx "startTime" (${tx.startTime}) is more than ${config.WinFlags.daoMaxProposalStartDelayMs}ms after the creation time (${tx.timestamp})`
     return response
   }
   const payloadError = validateProposalPayload(tx, AccountsStorage.cachedNetworkAccount, dapp)
@@ -261,8 +261,8 @@ export const apply = async (
       rateUsdStr: '0',
       address: tx.project.address,
       endorsedAddress: [],
-      durationBonusPercentage: config.LiberdusFlags.daoProjectDurationBonusPercentage,
-      durationPenaltyPercentage: config.LiberdusFlags.daoProjectDurationPenaltyPercentage,
+      durationBonusPercentage: config.WinFlags.daoProjectDurationBonusPercentage,
+      durationPenaltyPercentage: config.WinFlags.daoProjectDurationPenaltyPercentage,
       logs: [],
     }
   }

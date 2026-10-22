@@ -171,7 +171,7 @@ export const apply = (
     },
   }
 
-  if (config.LiberdusFlags.versionFlags.tollTaxFeeinAppReceipt === false) {
+  if (config.WinFlags.versionFlags.tollTaxFeeinAppReceipt === false) {
     delete appReceiptData.additionalInfo
   }
   const appReceiptDataHash = crypto.hashObj(appReceiptData)
@@ -219,7 +219,7 @@ export const createFailedAppReceiptData = (
 export const keys = (tx: Tx.Read, result: ShardusTypes.TransactionKeys): ShardusTypes.TransactionKeys => {
   result.sourceKeys = [tx.chatId, tx.from]
   result.targetKeys = [tx.to]
-  if (!config.LiberdusFlags.versionFlags.includeTxToKeyInReadTx) {
+  if (!config.WinFlags.versionFlags.includeTxToKeyInReadTx) {
     result.targetKeys = []
   }
   result.allKeys = [...result.sourceKeys, ...result.targetKeys]
@@ -232,7 +232,7 @@ export const memoryPattern = (tx: Tx.Read, result: ShardusTypes.TransactionKeys)
     wo: [],
     on: [],
     ri: [],
-    ro: !config.LiberdusFlags.versionFlags.includeTxToKeyInReadTx ? [] : [tx.to],
+    ro: !config.WinFlags.versionFlags.includeTxToKeyInReadTx ? [] : [tx.to],
   }
 }
 

@@ -1,7 +1,7 @@
 import * as crypto from '../../crypto'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import * as utils from './../../utils'
-import { LiberdusFlags } from './../../config'
+import { WinFlags } from './../../config'
 import * as AccountsStorage from '../../storage/accountStorage'
 import { UserAccount, WrappedStates, Tx, NodeAccount, AppReceiptData } from './../../@types'
 import { SafeBigIntMath } from '../../utils/safeBigIntMath'
@@ -85,7 +85,7 @@ export const validate = (
     response.reason = reason
     return response
   }
-  if (nodeAccount.rewardEndTime === 0 && nodeAccount.rewardStartTime > 0 && !(tx.force && LiberdusFlags.allowForceUnstake)) {
+  if (nodeAccount.rewardEndTime === 0 && nodeAccount.rewardStartTime > 0 && !(tx.force && WinFlags.allowForceUnstake)) {
     response.reason = `No reward endTime set, can't unstake node yet`
     return response
   }
@@ -163,7 +163,7 @@ export const apply = (
     },
   }
 
-  if (LiberdusFlags.versionFlags.stakingAppReceiptUpdate === false) {
+  if (WinFlags.versionFlags.stakingAppReceiptUpdate === false) {
     if ('penalty' in appReceiptData.additionalInfo) delete appReceiptData.additionalInfo.penalty
     if ('totalUnstakeAmount' in appReceiptData.additionalInfo) appReceiptData.additionalInfo.totalUnstakeAmount = stake + reward
   }
@@ -187,8 +187,8 @@ export const createFailedAppReceiptData = (
   let transactionFee = BigInt(0)
   if (from !== undefined && from !== null) {
     const network = AccountsStorage.cachedNetworkAccount
-    // Failed withdrawals charged the stored LIB fee before 2.5.2.
-    const txFee = LiberdusFlags.versionFlags.removeLegacyNetworkParams ? utils.getTransactionFeeWei(network) : utils.getLegacyTransactionFeeWei(network)
+    // Failed withdrawals charged the stored WIN fee before 2.5.2.
+    const txFee = WinFlags.versionFlags.removeLegacyNetworkParams ? utils.getTransactionFeeWei(network) : utils.getLegacyTransactionFeeWei(network)
 
     if (from.data.balance >= txFee) {
       transactionFee = txFee

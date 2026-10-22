@@ -1,6 +1,6 @@
 import { nestedCountersInstance, Shardus } from '@shardus/core'
 import { addStakeCert, CertSignaturesResult, queryCertificateHandler } from '../../transactions/staking/query_certificate'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { Utils } from '@shardus/lib-types'
 import { logFlags } from '@shardus/core/dist/logger'
 import { ValidatorError } from '../../@types'
@@ -9,14 +9,14 @@ export const queryCertificate =
   (dapp: Shardus) =>
   async (req, res): Promise<void> => {
     try {
-      nestedCountersInstance.countEvent('liberdus-staking', 'called query-certificate')
+      nestedCountersInstance.countEvent('win-staking', 'called query-certificate')
       const queryCertRes = await queryCertificateHandler(req, dapp)
-      if (LiberdusFlags.VerboseLogs) console.log('queryCertRes', queryCertRes)
+      if (WinFlags.VerboseLogs) console.log('queryCertRes', queryCertRes)
       if (queryCertRes.success) {
         addStakeCert((queryCertRes as CertSignaturesResult).signedStakeCert)
-        /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', `queryCertificateHandler success`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', `queryCertificateHandler success`)
       } else {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', `queryCertificateHandler failed with reason: ${(queryCertRes as ValidatorError).reason}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', `queryCertificateHandler failed with reason: ${(queryCertRes as ValidatorError).reason}`)
       }
 
       return res.json(Utils.safeJsonParse(Utils.safeStringify(queryCertRes)))

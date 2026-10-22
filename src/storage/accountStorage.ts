@@ -1,6 +1,6 @@
 import { NetworkAccount } from '../@types'
 import Storage from '../storage/storage'
-import { networkAccount, LiberdusFlags } from '../config'
+import { networkAccount, WinFlags } from '../config'
 import { Utils } from '@shardus/lib-types'
 import { Accounts } from '../@types'
 
@@ -31,7 +31,7 @@ export async function lazyInit(): Promise<void> {
 export async function getAccount(address: string): Promise<Accounts | null> {
   // Enforce lowercase address
   address = address.toLowerCase()
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     const account = await storage.getAccountsEntry(address)
     if (!account) return null
 
@@ -50,7 +50,7 @@ export async function getAccount(address: string): Promise<Accounts | null> {
 export async function getAccountTimestamp(address: string): Promise<number> {
   // Enforce lowercase address
   address = address.toLowerCase()
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     //todo replace with specific sql query
     const account = await storage.getAccountsEntry(address)
     return account.timestamp
@@ -63,7 +63,7 @@ export async function getAccountTimestamp(address: string): Promise<number> {
 export async function accountExists(address: string): Promise<boolean> {
   // Enforce lowercase address
   address = address.toLowerCase()
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     //todo replace with specific sql query, or even a shardus cache check
     const account = await storage.getAccountsEntry(address)
     return account != null
@@ -83,7 +83,7 @@ export async function setAccount(address: string, account: Accounts): Promise<vo
   try {
     // Enforce lowercase address
     address = address.toLowerCase()
-    if (LiberdusFlags.UseDBForAccounts === true) {
+    if (WinFlags.UseDBForAccounts === true) {
       const accountEntry = {
         accountId: address,
         timestamp: account.timestamp,
@@ -112,7 +112,7 @@ export const setCachedNetworkAccount = (account: NetworkAccount): void => {
 }
 
 export async function debugGetAllAccounts(): Promise<Accounts[]> {
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     return (await storage.debugSelectAllAccountsEntry()) as unknown as Accounts[]
   } else {
     return Object.values(accounts)
@@ -121,7 +121,7 @@ export async function debugGetAllAccounts(): Promise<Accounts[]> {
 }
 
 export async function clearAccounts(): Promise<void> {
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     //This lazy init is not ideal.. we only know this is called because of special knowledge
     //Would be much better to make a specific api that is called at the right time before data sync
     await lazyInit()
@@ -132,7 +132,7 @@ export async function clearAccounts(): Promise<void> {
 }
 
 export async function queryAccountsEntryByRanges(accountStart, accountEnd, maxRecords): Promise<Accounts[]> {
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     const processedResults: Accounts[] = []
     const results = await storage.queryAccountsEntryByRanges(accountStart, accountEnd, maxRecords)
     for (const result of results) {
@@ -148,7 +148,7 @@ export async function queryAccountsEntryByRanges(accountStart, accountEnd, maxRe
 }
 
 export async function queryAccountsEntryByRanges2(accountStart, accountEnd, tsStart, tsEnd, maxRecords, offset, accountOffset): Promise<Accounts[]> {
-  if (LiberdusFlags.UseDBForAccounts === true) {
+  if (WinFlags.UseDBForAccounts === true) {
     const processedResults: Accounts[] = []
     let results
 

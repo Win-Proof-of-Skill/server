@@ -104,7 +104,7 @@ export enum TXTypes {
   dao_project_change_address = 'dao_project_change_address',
 }
 
-export interface BaseLiberdusTx {
+export interface BaseWinTx {
   timestamp: number
   type: TXTypes
   sign: Signature
@@ -112,18 +112,18 @@ export interface BaseLiberdusTx {
 }
 
 export namespace Tx {
-  export interface Create extends BaseLiberdusTx {
+  export interface Create extends BaseWinTx {
     from: string
     to: string
     amount: bigint
   }
 
-  export interface InitNetwork extends BaseLiberdusTx {
+  export interface InitNetwork extends BaseWinTx {
     type: TXTypes
     timestamp: number
   }
 
-  export interface Message extends BaseLiberdusTx {
+  export interface Message extends BaseWinTx {
     from: string
     to: string
     chatId: string
@@ -134,7 +134,7 @@ export namespace Tx {
 
   export type MessageRecord = Message
 
-  export interface Read extends BaseLiberdusTx {
+  export interface Read extends BaseWinTx {
     from: string
     to: string
     chatId: string
@@ -142,7 +142,7 @@ export namespace Tx {
     fee?: bigint // Optional fee for the read transaction
   }
 
-  export interface UpdateChatToll extends BaseLiberdusTx {
+  export interface UpdateChatToll extends BaseWinTx {
     from: string
     to: string
     chatId: string
@@ -150,7 +150,7 @@ export namespace Tx {
     timestamp: number // timestamp up to which messages are considered read
   }
 
-  export interface UpdateTollRequired extends BaseLiberdusTx {
+  export interface UpdateTollRequired extends BaseWinTx {
     from: string
     to: string
     chatId: string
@@ -162,38 +162,38 @@ export namespace Tx {
 
   export type ChatMessageRecord = MessageRecord | Transfer | Read | UpdateTollRequired
 
-  export interface ReclaimToll extends BaseLiberdusTx {
+  export interface ReclaimToll extends BaseWinTx {
     from: string
     to: string
     chatId: string
     timestamp: number // timestamp up to which messages are considered read
   }
 
-  export interface ChangeConfig extends BaseLiberdusTx {
+  export interface ChangeConfig extends BaseWinTx {
     from: string
     cycle: number
     config: string
     signs: Signature[]
   }
 
-  export interface ApplyChangeConfig extends BaseLiberdusTx {
+  export interface ApplyChangeConfig extends BaseWinTx {
     from: string
     change: any
   }
 
-  export interface ChangeNetworkParam extends BaseLiberdusTx {
+  export interface ChangeNetworkParam extends BaseWinTx {
     from: string
     cycle: number
     config: string
     signs: Signature[]
   }
 
-  export interface ApplyChangeNetworkParam extends BaseLiberdusTx {
+  export interface ApplyChangeNetworkParam extends BaseWinTx {
     from: string
     change: any
   }
 
-  export interface Register extends BaseLiberdusTx {
+  export interface Register extends BaseWinTx {
     aliasHash: string
     from: string
     alias: string
@@ -202,14 +202,14 @@ export namespace Tx {
     private?: boolean
   }
 
-  export interface Toll extends BaseLiberdusTx {
+  export interface Toll extends BaseWinTx {
     from: string
     toll: bigint
     tollUnit: TollUnit
     fee?: bigint // Optional fee for the toll transaction
   }
 
-  export interface Transfer extends BaseLiberdusTx {
+  export interface Transfer extends BaseWinTx {
     from: string
     to: string
     amount: bigint
@@ -222,31 +222,31 @@ export namespace Tx {
     deductTxFeeFromAmount?: boolean // Optional, defaults to false. If true, tx fee is deducted from the transfer amount.
   }
 
-  export interface SetCertTime extends BaseLiberdusTx {
+  export interface SetCertTime extends BaseWinTx {
     nominee: string
     nominator: string
     duration: number
   }
 
-  export interface DepositStake extends BaseLiberdusTx {
+  export interface DepositStake extends BaseWinTx {
     nominee: string
     nominator: string
     stake: bigint
   }
 
-  export interface WithdrawStake extends BaseLiberdusTx {
+  export interface WithdrawStake extends BaseWinTx {
     nominee: string
     nominator: string
     force: boolean
   }
 
-  export interface InitRewardTX extends BaseLiberdusTx {
+  export interface InitRewardTX extends BaseWinTx {
     nominee: string
     nodeActivatedTime: number
     txData: NodeInitTxData
   }
 
-  export interface ClaimRewardTX extends BaseLiberdusTx {
+  export interface ClaimRewardTX extends BaseWinTx {
     nominee: string
     nominator: string
     deactivatedNodeId: string
@@ -254,7 +254,7 @@ export namespace Tx {
     txData: NodeRewardTxData
   }
 
-  export interface PenaltyTX extends BaseLiberdusTx {
+  export interface PenaltyTX extends BaseWinTx {
     reportedNodeId: string
     reportedNodePublickKey: string
     nominator: string
@@ -263,7 +263,7 @@ export namespace Tx {
   }
 
   // New DAO transaction interfaces (Phase 1: governance/economic/protocol proposals)
-  export interface DaoProposalCreate extends BaseLiberdusTx {
+  export interface DaoProposalCreate extends BaseWinTx {
     from: string
     proposalId: string
     metaId: string
@@ -286,7 +286,7 @@ export namespace Tx {
     startTime?: number
   }
 
-  export interface DaoCommitteeVote extends BaseLiberdusTx {
+  export interface DaoCommitteeVote extends BaseWinTx {
     from: string
     proposalId: string
     vote: 'accept' | 'withhold'
@@ -294,12 +294,12 @@ export namespace Tx {
     withheldReason?: string
   }
 
-  export interface DaoCommitteeResult extends BaseLiberdusTx {
+  export interface DaoCommitteeResult extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoVote extends BaseLiberdusTx {
+  export interface DaoVote extends BaseWinTx {
     from: string
     proposalId: string
     // Relative weight the voter assigns to each proposal option, mapped 1:1 by index onto
@@ -311,37 +311,37 @@ export namespace Tx {
     spend: bigint
   }
 
-  export interface DaoVoteResult extends BaseLiberdusTx {
+  export interface DaoVoteResult extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoApplyParameters extends BaseLiberdusTx {
+  export interface DaoApplyParameters extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoUnapplyParameters extends BaseLiberdusTx {
+  export interface DaoUnapplyParameters extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoClaimReward extends BaseLiberdusTx {
+  export interface DaoClaimReward extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoBurnReward extends BaseLiberdusTx {
+  export interface DaoBurnReward extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoCancel extends BaseLiberdusTx {
+  export interface DaoCancel extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoProjectStart extends BaseLiberdusTx {
+  export interface DaoProjectStart extends BaseWinTx {
     from: string
     proposalId: string
   }
@@ -350,7 +350,7 @@ export namespace Tx {
    * No milestone number: the policy says "start the next milestone", so the handler derives it as
    * the first one still pending rather than taking it from the sender.
    */
-  export interface DaoProjectMilestoneStart extends BaseLiberdusTx {
+  export interface DaoProjectMilestoneStart extends BaseWinTx {
     from: string
     proposalId: string
     /** Present when proposing a time; absent when endorsing the pending one. */
@@ -358,38 +358,38 @@ export namespace Tx {
   }
 
   /** Likewise derived — "end the current milestone", the one that is executing. */
-  export interface DaoProjectMilestoneEnd extends BaseLiberdusTx {
+  export interface DaoProjectMilestoneEnd extends BaseWinTx {
     from: string
     proposalId: string
     proposedTime?: number
   }
 
-  export interface DaoProjectMilestoneTerminate extends BaseLiberdusTx {
+  export interface DaoProjectMilestoneTerminate extends BaseWinTx {
     from: string
     proposalId: string
     milestoneNumber: number
     reason: string
   }
 
-  export interface DaoProjectMilestoneClaim extends BaseLiberdusTx {
+  export interface DaoProjectMilestoneClaim extends BaseWinTx {
     from: string
     proposalId: string
     milestoneNumber: number
   }
 
-  export interface DaoProjectChangeAddress extends BaseLiberdusTx {
+  export interface DaoProjectChangeAddress extends BaseWinTx {
     from: string
     proposalId: string
     /** Present when proposing a replacement; absent when endorsing the pending one. */
     proposedAddress?: string
   }
 
-  export interface DaoProjectEnd extends BaseLiberdusTx {
+  export interface DaoProjectEnd extends BaseWinTx {
     from: string
     proposalId: string
   }
 
-  export interface DaoProjectReclaimBalance extends BaseLiberdusTx {
+  export interface DaoProjectReclaimBalance extends BaseWinTx {
     from: string
     proposalId: string
   }
@@ -401,7 +401,7 @@ export interface Signature {
 }
 
 export enum TollUnit {
-  lib = 'LIB',
+  win= 'WIN',
   usd = 'USD',
 }
 
@@ -628,9 +628,9 @@ export interface DaoProjectData {
   milestones: DaoMilestone[]
   startTime?: number
   endTime?: number
-  /** LIB minted at project start, in wei; drawn down by milestone claims. */
+  /** WIN minted at project start, in wei; drawn down by milestone claims. */
   balance: bigint
-  /** USD/LIB rate fixed when balance was minted. Every payout converts at this, not the live rate. */
+  /** USD/WIN rate fixed when balance was minted. Every payout converts at this, not the live rate. */
   rateUsdStr: string
   /** Contractor address permitted to claim completed milestones. */
   address: string
@@ -908,12 +908,12 @@ export interface SignedNodeInitTxData extends NodeInitTxData {
 
 export enum ViolationType {
   // 0-999 reserved for shardus core
-  LiberdusMinID = 999,
+  WinMinID = 999,
   LeftNetworkEarly = 1000,
   SyncingTooLong = 1001,
   DoubleVote = 1002,
   NodeRefuted = 1003,
-  LiberdusMaxID = 2000,
+  WinMaxID = 2000,
 }
 
 export interface SyncingTimeoutViolationData {

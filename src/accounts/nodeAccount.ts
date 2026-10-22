@@ -3,7 +3,7 @@ import { VectorBufferStream } from '@shardus/core'
 import { SerdeTypeIdent } from '.'
 import { NodeAccount } from '../@types'
 import { Utils } from '@shardus/lib-types'
-import { LiberdusFlags } from '../config'
+import { WinFlags } from '../config'
 
 const populatedRetiredFieldsError = 'NodeAccount binary codec does not support populated retired fields'
 
@@ -20,7 +20,7 @@ export const nodeAccount = (accountId: string): NodeAccount => {
   const account: NodeAccount = {
     id: accountId,
     type: 'NodeAccount',
-    ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { balance: BigInt(0), nodeRewardTime: 0 }),
+    ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { balance: BigInt(0), nodeRewardTime: 0 }),
     hash: '',
     timestamp: 0,
     nominator: '',
@@ -91,7 +91,7 @@ export const deserializeNodeAccount = (stream: VectorBufferStream, root = false)
   return {
     id,
     type,
-    ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { balance: BigInt(0), nodeRewardTime: 0 }),
+    ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { balance: BigInt(0), nodeRewardTime: 0 }),
     hash: stream.readString(),
     timestamp: Number(stream.readBigUInt64()),
     nominator: stream.readString(),

@@ -104,7 +104,7 @@ export const apply = (
   // Validate rather than clamp: a bogus 0 must not collapse to 1 and flip on the first vote —
   // this value is consensus-relevant, so it needs a sane fallback, not a naive Math.max.
   const committeeSize = proposal.committeeAddresses.length
-  const configuredThreshold = config.LiberdusFlags.daoUnapplyCommitteeThreshold
+  const configuredThreshold = config.WinFlags.daoUnapplyCommitteeThreshold
   const baseThreshold = Number.isSafeInteger(configuredThreshold) && configuredThreshold > 0 ? configuredThreshold : 3
   const threshold = Math.min(baseThreshold, committeeSize)
 

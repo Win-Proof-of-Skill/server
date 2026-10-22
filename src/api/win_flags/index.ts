@@ -1,19 +1,19 @@
 import { nestedCountersInstance, Shardus } from '@shardus/core'
-import { LiberdusFlags, updateLiberdusFlag } from '../../config'
+import { WinFlags, updateWinFlag } from '../../config'
 
-export const debug_liberdus_flags =
+export const debug_win_flags =
   (dapp: Shardus) =>
   async (req, res): Promise<void> => {
     try {
-      nestedCountersInstance.countEvent('liberdus-flags', 'called debug_liberdus_flags')
-      return res.json({ LiberdusFlags })
+      nestedCountersInstance.countEvent('win-flags', 'called debug_win_flags')
+      return res.json({ WinFlags })
     } catch (e) {
-      dapp.log('debug_liberdus_flags', e)
+      dapp.log('debug_win_flags', e)
       return res.json({ error: e.message })
     }
   }
 
-export const set_liberdus_flag =
+export const set_win_flag =
   (dapp: Shardus) =>
   async (req, res): Promise<void> => {
     let value
@@ -22,7 +22,7 @@ export const set_liberdus_flag =
       key = req.query.key as string
       value = req.query.value as string
       if (value == null) {
-        return res.json(`debug-set-liberdus-flag: ${value} == null`)
+        return res.json(`debug-set-win-flag: ${value} == null`)
       }
 
       let typedValue: boolean | number | string
@@ -31,11 +31,11 @@ export const set_liberdus_flag =
       else if (value === 'false') typedValue = false
       else if (!Number.isNaN(Number(value))) typedValue = Number(value)
 
-      updateLiberdusFlag(key, typedValue)
+      updateWinFlag(key, typedValue)
 
-      return res.json({ [key]: LiberdusFlags[key] }) // eslint-disable-line security/detect-object-injection
+      return res.json({ [key]: WinFlags[key] }) // eslint-disable-line security/detect-object-injection
     } catch (err) {
-      dapp.log('set_liberdus_flag', err)
-      return res.json(`debug-set-liberdus-flag: ${key} ${err.message} `)
+      dapp.log('set_win_flag', err)
+      return res.json(`debug-set-win-flag: ${key} ${err.message} `)
     }
   }

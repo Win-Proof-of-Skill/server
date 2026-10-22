@@ -11,8 +11,8 @@
  */
 
 import { getVotingStart, getVotingEnd } from '../src/accounts/daoProposalAccount'
-import { getTimeMultiplier, calculateOptionWeights, calculateVoteWeightDetails, DaoDecimal, WEI_PER_LIB, WEIGHT_PRECISION } from '../src/utils/dao/daoVoteMath'
-import { libToWei } from '../src/utils'
+import { getTimeMultiplier, calculateOptionWeights, calculateVoteWeightDetails, DaoDecimal, WEI_PER_WIN, WEIGHT_PRECISION } from '../src/utils/dao/daoVoteMath'
+import { wintoWei } from '../src/utils'
 import { DaoProposalAccount } from '../src/@types'
 
 interface Scenario {
@@ -22,10 +22,10 @@ interface Scenario {
   reviewDuration: number
   votingDuration: number
   emergency: boolean
-  minimumSpendLib: number
+  minimumSpendWin: number
   voteExponent: number
   // Vote tx inputs
-  spendLib: number
+  spendWin: number
   weights: number[]
   // When the vote is cast, expressed as an offset (seconds) from votingStart
   castAtOffsetFromVotingStart: number
@@ -38,9 +38,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 200,
+    spendWin: 200,
     weights: [1, 2, 1],
     castAtOffsetFromVotingStart: 10, // well within first half (halfDuration = 45s)
   },
@@ -50,9 +50,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 200,
+    spendWin: 200,
     weights: [1, 2, 1],
     castAtOffsetFromVotingStart: 45, // == halfDuration
   },
@@ -62,9 +62,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 200,
+    spendWin: 200,
     weights: [1, 2, 1],
     castAtOffsetFromVotingStart: 67, // 45 + 22.5 -> ~half of the second half elapsed
   },
@@ -74,9 +74,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 200,
+    spendWin: 200,
     weights: [1, 2, 1],
     castAtOffsetFromVotingStart: 90, // == votingDuration -> at votingEnd
   },
@@ -86,9 +86,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 1000,
+    spendWin: 1000,
     weights: [1, 1],
     castAtOffsetFromVotingStart: 0,
   },
@@ -98,9 +98,9 @@ const SCENARIOS: Scenario[] = [
     reviewDuration: 90,
     votingDuration: 90,
     emergency: false,
-    minimumSpendLib: 1,
+    minimumSpendWin: 1,
     voteExponent: 0.1,
-    spendLib: 200,
+    spendWin: 200,
     weights: [1, 0, 0],
     castAtOffsetFromVotingStart: 0,
   },
@@ -121,15 +121,15 @@ function buildProposal(scenario: Scenario): Pick<DaoProposalAccount, 'startTime'
 }
 
 function formatWei(wei: bigint): string {
-  return `${wei.toString()} wei (${new DaoDecimal(wei.toString()).dividedBy(WEI_PER_LIB).toString()} LIB)`
+  return `${wei.toString()} wei (${new DaoDecimal(wei.toString()).dividedBy(WEI_PER_WIN).toString()} WIN)`
 }
 
 for (const scenario of SCENARIOS) {
   console.log(`\n=== ${scenario.name} ===`)
 
   const proposal = buildProposal(scenario)
-  const minimumSpendWei = libToWei(scenario.minimumSpendLib)
-  console.log(`  [1] minimumSpendWei: ${minimumSpendWei.toString()} (= ${scenario.minimumSpendLib} LIB * 1e18)`)
+  const minimumSpendWei = wintoWei(scenario.minimumSpendWin)
+  console.log(`  [1] minimumSpendWei: ${minimumSpendWei.toString()} (= ${scenario.minimumSpendWin} WIN * 1e18)`)
   console.log(`  [1] voteExponent:    ${proposal.voteExponent}`)
 
   const votingStart = getVotingStart(proposal as DaoProposalAccount)
@@ -154,7 +154,7 @@ for (const scenario of SCENARIOS) {
     console.log(`  [4] timeMultiplier:  ${timeMultiplier.toString()} (= max(0, (votingEnd - txTimestamp) / halfDuration) = max(0, ${timeLeft} / ${halfDuration}))`)
   }
 
-  const spendWei = libToWei(scenario.spendLib)
+  const spendWei = wintoWei(scenario.spendWin)
   console.log(`  [5] spendWei:        ${formatWei(spendWei)}`)
 
   console.log(`  [6] weights[]:       [${scenario.weights.join(', ')}]`)
@@ -166,11 +166,11 @@ for (const scenario of SCENARIOS) {
     weights: scenario.weights,
     timeMultiplier,
   }
-  const { totalSelectionWeight, spendInLIB, spendBoost, baseWeight } = calculateVoteWeightDetails(voteWeightInput)
+  const { totalSelectionWeight, spendInWIN, spendBoost, baseWeight } = calculateVoteWeightDetails(voteWeightInput)
   console.log(`  [6] totalSelectionWeight: ${totalSelectionWeight}`)
-  console.log(`  [7] spendInLIB:      ${spendInLIB.toString()} (= spendWei / 1e18)`)
+  console.log(`  [7] spendInWIN:      ${spendInWIN.toString()} (= spendWei / 1e18)`)
   console.log(`  [7] spendBoost:      ${spendBoost.toString()} (= (spendWei / minSpendWei)^${proposal.voteExponent})`)
-  console.log(`  [7] baseWeight:      ${baseWeight.toString()} (= spendInLIB * spendBoost * timeMultiplier * WEIGHT_PRECISION / totalSelectionWeight)`)
+  console.log(`  [7] baseWeight:      ${baseWeight.toString()} (= spendInWIN * spendBoost * timeMultiplier * WEIGHT_PRECISION / totalSelectionWeight)`)
 
   const optionWeights = calculateOptionWeights(voteWeightInput)
   for (let i = 0; i < scenario.weights.length; i++) {

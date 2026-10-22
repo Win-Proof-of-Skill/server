@@ -1,5 +1,5 @@
-# Testing Liberdus Functionalities
-This document describes all the key features of Liberdus application and steps to test those features using CLI tool or web browser.
+# Testing Win Functionalities
+This document describes all the key features of Win application and steps to test those features using CLI tool or web browser.
 
 ## Key Features
 - Sign up + Sign In

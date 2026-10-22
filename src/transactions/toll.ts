@@ -1,7 +1,7 @@
 import * as crypto from '../crypto'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import * as utils from '../utils'
-import { LiberdusFlags } from '../config'
+import { WinFlags } from '../config'
 import { Accounts, AppReceiptData, TollUnit, Tx, UserAccount, WrappedStates } from '../@types'
 import * as AccountsStorage from '../storage/accountStorage'
 import { SafeBigIntMath } from '../utils/safeBigIntMath'
@@ -20,17 +20,17 @@ export const validate_fields = (tx: Tx.Toll, response: ShardusTypes.IncomingTran
     response.reason = 'tx "tollUnit" field must be a valid TollUnit enum value.'
     return response
   }
-  let tollInLib = tx.toll
+  let tollInWin = tx.toll
   if (tx.tollUnit === TollUnit.usd) {
-    tollInLib = utils.usdToWei(tx.toll, AccountsStorage.cachedNetworkAccount)
+    tollInWin = utils.usdToWei(tx.toll, AccountsStorage.cachedNetworkAccount)
   }
-  if (tollInLib > 0 && tollInLib < utils.getMinTollWei(AccountsStorage.cachedNetworkAccount)) {
-    const minTollInLib = utils.weiToLib(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))
-    response.reason = `Minimum "toll" allowed is ${minTollInLib} LIB`
+  if (tollInWin > 0 && tollInWin < utils.getMinTollWei(AccountsStorage.cachedNetworkAccount)) {
+    const minTollInWin = utils.weiToWin(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))
+    response.reason = `Minimum "toll" allowed is ${minTollInWin} WIN`
     return response
   }
-  if (tx.toll > utils.libToWei(1000000)) {
-    response.reason = 'Maximum toll allowed is 1,000,000 LIB or USD.'
+  if (tx.toll > utils.wintoWei(1000000)) {
+    response.reason = 'Maximum toll allowed is 1,000,000 WIN or USD.'
     return response
   }
   if (!tx.sign || !tx.sign.owner || !tx.sign.sig || tx.sign.owner !== tx.from) {
@@ -74,28 +74,28 @@ export const validate = (
     response.reason = 'Toll cannot be negative'
     return response
   }
-  if (LiberdusFlags.versionFlags.allowZeroToll === false) {
+  if (WinFlags.versionFlags.allowZeroToll === false) {
     if (tx.tollUnit === TollUnit.usd) {
       tollInWei = utils.usdToWei(tx.toll, network)
     }
     if (tollInWei < utils.getMinTollWei(AccountsStorage.cachedNetworkAccount)) {
-      response.reason = `Minimum "toll" allowed is ${utils.weiToLib(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))} LIB`
+      response.reason = `Minimum "toll" allowed is ${utils.weiToWin(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))} WIN`
       return response
     }
-    if (tollInWei > utils.libToWei(1000000)) {
-      response.reason = 'Maximum toll allowed is 1,000,000 LIB'
+    if (tollInWei > utils.wintoWei(1000000)) {
+      response.reason = 'Maximum toll allowed is 1,000,000 WIN'
       return response
     }
-  } else if (LiberdusFlags.versionFlags.allowZeroToll && tollInWei > 0n) {
+  } else if (WinFlags.versionFlags.allowZeroToll && tollInWei > 0n) {
     if (tx.tollUnit === TollUnit.usd) {
       tollInWei = utils.usdToWei(tx.toll, network)
     }
     if (tollInWei < utils.getMinTollWei(AccountsStorage.cachedNetworkAccount)) {
-      response.reason = `Minimum "toll" allowed is ${utils.weiToLib(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))} LIB`
+      response.reason = `Minimum "toll" allowed is ${utils.weiToWin(utils.getMinTollWei(AccountsStorage.cachedNetworkAccount))} WIN`
       return response
     }
-    if (tollInWei > utils.libToWei(1000000)) {
-      response.reason = 'Maximum toll allowed is 1,000,000 LIB'
+    if (tollInWei > utils.wintoWei(1000000)) {
+      response.reason = 'Maximum toll allowed is 1,000,000 WIN'
       return response
     }
   }

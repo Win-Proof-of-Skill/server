@@ -1,6 +1,6 @@
 import { nestedCountersInstance, Shardus, ShardusTypes } from '@shardus/core'
 import * as crypto from '../../crypto'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { TXTypes, Tx, NodeAccount, WrappedStates, AppReceiptData } from '../../@types'
 import * as AccountsStorage from '../../storage/accountStorage'
 import { _sleep, generateTxId, getNodeRewardRateWei, isValidAddress } from '../../utils'
@@ -24,22 +24,22 @@ export async function injectInitRewardTx(shardus: Shardus, eventData: ShardusTyp
     //try one more time
     wrappedData = await shardus.getLocalOrRemoteAccount(eventData.publicKey)
     if (wrappedData == null || wrappedData.data == null) {
-      if (LiberdusFlags.VerboseLogs) console.log(`injectInitRewardTx failed cant find : ${eventData.publicKey}`)
-      nestedCountersInstance.countEvent('liberdus-staking', `injectInitRewardTx failed cant find node`)
+      if (WinFlags.VerboseLogs) console.log(`injectInitRewardTx failed cant find : ${eventData.publicKey}`)
+      nestedCountersInstance.countEvent('win-staking', `injectInitRewardTx failed cant find node`)
       return { success: false, reason: 'cant find node account' }
     }
   }
   const nodeAccount = wrappedData.data as NodeAccount
   // check if the nodeAccount has nomimator data
   if (nodeAccount.nominator == null || nodeAccount.nominator === '') {
-    if (LiberdusFlags.VerboseLogs) console.log(`injectInitRewardTx failed cant find nomimator : ${eventData.publicKey}`, nodeAccount)
-    nestedCountersInstance.countEvent('liberdus-staking', `injectInitRewardTx failed cant find nomimator`)
+    if (WinFlags.VerboseLogs) console.log(`injectInitRewardTx failed cant find nomimator : ${eventData.publicKey}`, nodeAccount)
+    nestedCountersInstance.countEvent('win-staking', `injectInitRewardTx failed cant find nomimator`)
     return { success: false, reason: 'cant find nomimator' }
   }
   // check if nodeAccount.rewardStartTime is already set to eventData.time
   if (nodeAccount.rewardStartTime >= tx.nodeActivatedTime) {
-    if (LiberdusFlags.VerboseLogs) console.log(`injectInitRewardTx failed rewardStartTime already set : ${eventData.publicKey}`, nodeAccount)
-    nestedCountersInstance.countEvent('liberdus-staking', `injectInitRewardTx failed rewardStartTime already set`)
+    if (WinFlags.VerboseLogs) console.log(`injectInitRewardTx failed rewardStartTime already set : ${eventData.publicKey}`, nodeAccount)
+    nestedCountersInstance.countEvent('win-staking', `injectInitRewardTx failed rewardStartTime already set`)
     return { success: false, reason: 'rewardStartTime is already set' }
   }
 
@@ -56,7 +56,7 @@ export async function injectInitRewardTx(shardus: Shardus, eventData: ShardusTyp
   await _sleep(waitTime)
 
   tx = shardus.signAsNode(tx)
-  if (LiberdusFlags.VerboseLogs) {
+  if (WinFlags.VerboseLogs) {
     const txId = generateTxId(tx)
     console.log(`injectInitRewardTx: tx.timestamp: ${tx.timestamp} txid: ${txId}`, tx)
   }
@@ -68,56 +68,56 @@ export const validate_fields = (
   response: ShardusTypes.IncomingTransactionResult,
   shardus: Shardus,
 ): ShardusTypes.IncomingTransactionResult => {
-  if (LiberdusFlags.VerboseLogs) console.log('Validating InitRewardTX fields', tx)
+  if (WinFlags.VerboseLogs) console.log('Validating InitRewardTX fields', tx)
   if (isValidAddress(tx.nominee) === false) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTX fail invalid nominee field', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTX fail invalid nominee field`)
+    if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTX fail invalid nominee field', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTX fail invalid nominee field`)
     response.reason = 'invalid nominee field in setRewardTimes Tx'
     return response
   }
   if (!tx.nodeActivatedTime) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTX fail nodeActivatedTime missing', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTX fail nodeActivatedTime missing`)
+    if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTX fail nodeActivatedTime missing', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTX fail nodeActivatedTime missing`)
     response.reason = 'nodeActivatedTime field is not found in setRewardTimes Tx'
     return response
   }
   if (tx.nodeActivatedTime < 0 || tx.nodeActivatedTime > dapp.shardusGetTime()) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTX fail nodeActivatedTime is not correct ', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTX fail nodeActivatedTime is not correct`)
+    if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTX fail nodeActivatedTime is not correct ', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTX fail nodeActivatedTime is not correct`)
     response.reason = 'nodeActivatedTime field is not correct in setRewardTimes Tx'
     return response
   }
   // only allow init reward txs for tx data that is in the serviceQueue
   if (!shardus.serviceQueue.containsTxData(tx.txData)) {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail node not in serviceQueue', tx)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTimes fail node not in serviceQueue`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail node not in serviceQueue', tx)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTimes fail node not in serviceQueue`)
     response.reason = 'node not in serviceQueue'
     return response
   }
 
   // check txData matches tx
   if (tx.txData.startTime !== tx.nodeActivatedTime) {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail txData.startTime does not match nodeActivatedTime', tx)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTimes fail txData.startTime does not match nodeActivatedTime`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail txData.startTime does not match nodeActivatedTime', tx)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTimes fail txData.startTime does not match nodeActivatedTime`)
     response.reason = 'txData.startTime does not match nodeActivatedTime'
     return response
   }
 
   if (tx.txData.publicKey !== tx.nominee) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTimes fail txData.publicKey does not match tx.nominee`)
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail txData.publicKey does not match tx.nominee', tx)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTimes fail txData.publicKey does not match tx.nominee`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTimes fail txData.publicKey does not match tx.nominee', tx)
     response.reason = 'txData.publicKey does not match tx.nominee'
     return response
   }
   const isValid = crypto.verifyObj(tx, true)
   if (!isValid) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTX fail invalid signature', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateFields InitRewardTX fail invalid signature`)
+    if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTX fail invalid signature', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateFields InitRewardTX fail invalid signature`)
     response.reason = 'invalid signature in setRewardTimes Tx'
     return response
   }
   response.success = true
-  if (LiberdusFlags.VerboseLogs) console.log('validateFields InitRewardTX success', tx)
+  if (WinFlags.VerboseLogs) console.log('validateFields InitRewardTX success', tx)
   return response
 }
 
@@ -126,28 +126,28 @@ export const validate = (
   wrappedStates: WrappedStates,
   response: ShardusTypes.IncomingTransactionResult,
 ): ShardusTypes.IncomingTransactionResult => {
-  if (LiberdusFlags.VerboseLogs) console.log('Validating InitRewardTX', tx)
+  if (WinFlags.VerboseLogs) console.log('Validating InitRewardTX', tx)
   const nodeAccount = wrappedStates[tx.nominee].data as NodeAccount
   if (nodeAccount && !isNodeAccount(nodeAccount)) {
-    nestedCountersInstance.countEvent('liberdus-staking', `validateInitRewardTX fail nodeAccount is not a NodeAccount`)
-    if (LiberdusFlags.VerboseLogs) console.log('validateInitRewardTX fail nodeAccount is not a NodeAccount', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateInitRewardTX fail nodeAccount is not a NodeAccount`)
+    if (WinFlags.VerboseLogs) console.log('validateInitRewardTX fail nodeAccount is not a NodeAccount', tx)
     response.reason = 'nominee account is not a NodeAccount'
     return response
   }
   // check if nodeAccount.rewardStartTime is already set to tx.nodeActivatedTime
   if (nodeAccount.rewardStartTime >= tx.nodeActivatedTime) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateInitRewardTX fail rewardStartTime already set', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateInitRewardTX fail rewardStartTime already set`)
+    if (WinFlags.VerboseLogs) console.log('validateInitRewardTX fail rewardStartTime already set', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateInitRewardTX fail rewardStartTime already set`)
     response.reason = 'rewardStartTime is already set'
     return response
   }
   if (nodeAccount.timestamp >= tx.timestamp) {
-    if (LiberdusFlags.VerboseLogs) console.log('validateInitRewardTX fail timestamp already set', tx)
-    nestedCountersInstance.countEvent('liberdus-staking', `validateInitRewardTX fail timestamp already set`)
+    if (WinFlags.VerboseLogs) console.log('validateInitRewardTX fail timestamp already set', tx)
+    nestedCountersInstance.countEvent('win-staking', `validateInitRewardTX fail timestamp already set`)
     response.reason = 'timestamp is already set'
     return response
   }
-  if (LiberdusFlags.VerboseLogs) console.log('validateInitRewardTX success', tx)
+  if (WinFlags.VerboseLogs) console.log('validateInitRewardTX success', tx)
   response.success = true
   response.reason = 'This transaction is valid!'
   return response
@@ -180,7 +180,7 @@ export const apply = (
   }
   const appReceiptDataHash = crypto.hashObj(appReceiptData)
   dapp.applyResponseAddReceiptData(applyResponse, appReceiptData, appReceiptDataHash)
-  nestedCountersInstance.countEvent('liberdus-staking', `Applied InitRewardTX`)
+  nestedCountersInstance.countEvent('win-staking', `Applied InitRewardTX`)
   dapp.log('Applied InitRewardTX for', tx.nominee)
 }
 

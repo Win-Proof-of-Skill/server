@@ -65,7 +65,7 @@ if (distPackageJson.name !== 'shardus-global-server-dist') {
 */
 
 // Build the docker image and push it to the gitlab registry
-const dockerBuildCmd = `DOCKER_BUILDKIT=1 docker build --secret id=mysecret,src=.dockersecret -t registry.gitlab.com/liberdus/server:${tag} -f ${dockerfile} .`
+const dockerBuildCmd = `DOCKER_BUILDKIT=1 docker build --secret id=mysecret,src=.dockersecret -t registry.gitlab.com/win/server:${tag} -f ${dockerfile} .`
 try {
   execa.commandSync(dockerBuildCmd, { stdio: [0, 1, 2] })
 } catch (err) {
@@ -74,7 +74,7 @@ try {
 
 execa.commandSync(`docker login registry.gitlab.com`, { stdio: [0, 1, 2] })
 
-const dockerPushCmd = `docker push registry.gitlab.com/liberdus/server:${tag}`
+const dockerPushCmd = `docker push registry.gitlab.com/win/server:${tag}`
 try {
   execa.commandSync(dockerPushCmd, { stdio: [0, 1, 2] })
 } catch (err) {

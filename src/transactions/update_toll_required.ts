@@ -168,7 +168,7 @@ export const apply = (
   chat.timestamp = txTimestamp
   from.timestamp = txTimestamp
 
-  if (config.LiberdusFlags.versionFlags.updateTollRequiredTxInChatHistory) {
+  if (config.WinFlags.versionFlags.updateTollRequiredTxInChatHistory) {
     chat.messages.push(tx)
 
     // Update both participants' chat indexes so the toll status change is immediately

@@ -1,7 +1,7 @@
 import type { Shardus } from '@shardus/core'
 import type { NetworkAccount, DaoProposalType } from '../../@types'
 import * as utils from '../../utils'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { resolveParamPathForProposalType, pathsOverlap } from './daoParamResolver'
 
 // Resolves each change key against the appropriate parameter source, validates the value
@@ -94,8 +94,8 @@ export function validateCommitteeAddresses(coerced: unknown): void {
   if (!Array.isArray(coerced)) {
     throw new Error('committeeAddresses must be an array')
   }
-  const min = LiberdusFlags.minCommitteeMembers
-  const max = LiberdusFlags.maxCommitteeMembers
+  const min = WinFlags.minCommitteeMembers
+  const max = WinFlags.maxCommitteeMembers
   if (coerced.length < min || coerced.length > max) {
     throw new Error(`committeeAddresses must contain between ${min} and ${max} members (got ${coerced.length})`)
   }

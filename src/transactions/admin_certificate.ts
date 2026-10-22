@@ -1,7 +1,7 @@
 import { Shardus, ShardusTypes, nestedCountersInstance } from '@shardus/core'
 import { logFlags } from '@shardus/core/dist/logger'
 import { Utils } from '@shardus/lib-types'
-import config, { LiberdusFlags } from '../config'
+import config, { WinFlags } from '../config'
 import * as crypto from '../crypto'
 import { Request } from 'express'
 import { DevSecurityLevel } from '@shardus/core'
@@ -76,13 +76,13 @@ function validatePutAdminCertRequest(req: PutAdminCertRequest, shardus: Shardus)
   const publicKey = shardus.crypto.getPublicKey()
 
   if (utils.isValidAddress(req.nominee) === false) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-admin-certificate', `validatePutAdminCertRequest fail req.nominee address invalid`)
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validatePutAdminCertRequest fail req.nominee address invalid', req)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-admin-certificate', `validatePutAdminCertRequest fail req.nominee address invalid`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validatePutAdminCertRequest fail req.nominee address invalid', req)
     return { success: false, reason: 'Invalid nominee address' }
   }
   if (req.nominee != publicKey) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-admin-certificate', `validatePutAdminCertRequest fail req.nominee address and the current node public key do not match`)
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validatePutAdminCertRequest fail req.nominee address and the current node public key do not match', req)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-admin-certificate', `validatePutAdminCertRequest fail req.nominee address and the current node public key do not match`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validatePutAdminCertRequest fail req.nominee address and the current node public key do not match', req)
     return { success: false, reason: 'nominee address and the current node public key do not match' }
   }
   try {
@@ -107,12 +107,12 @@ function validatePutAdminCertRequest(req: PutAdminCertRequest, shardus: Shardus)
 }
 
 export async function putAdminCertificateHandler(req: Request, shardus: Shardus): Promise<PutAdminCertResult> {
-  nestedCountersInstance.countEvent('liberdus-admin-certificate', 'calling putAdminCertificateHandler')
+  nestedCountersInstance.countEvent('win-admin-certificate', 'calling putAdminCertificateHandler')
 
   const certReq = req.body as PutAdminCertRequest
   const reqValidationResult = validatePutAdminCertRequest(certReq, shardus)
   if (!reqValidationResult.success) {
-    nestedCountersInstance.countEvent('liberdus-admin-certificate', 'putAdminCertificateHandler: failed validateQueryCertRequest')
+    nestedCountersInstance.countEvent('win-admin-certificate', 'putAdminCertificateHandler: failed validateQueryCertRequest')
     return reqValidationResult
   }
   adminCert = certReq
@@ -121,7 +121,7 @@ export async function putAdminCertificateHandler(req: Request, shardus: Shardus)
 
 export async function tryAndFetchGoldenTicket(publicKey: string, network: NetworkAccount, dapp: Shardus, isRetry = false): Promise<GoldenTicketFetchResult> {
   try {
-    if (LiberdusFlags.VerboseLogs) console.log('Fetching golden ticket from', network.current.goldenTicketServerUrl, 'for publicKey', publicKey, 'node')
+    if (WinFlags.VerboseLogs) console.log('Fetching golden ticket from', network.current.goldenTicketServerUrl, 'for publicKey', publicKey, 'node')
     const goldenTicketRequest: any = {
       publicKey,
       ip: config.server.ip.externalIp,
@@ -130,9 +130,9 @@ export async function tryAndFetchGoldenTicket(publicKey: string, network: Networ
       nonce: Math.floor(Math.random() * 1e6),
     }
     const signedGoldenTicketRequest: GoldenTicketRequest = dapp.signAsNode(goldenTicketRequest)
-    if (LiberdusFlags.VerboseLogs) console.log('Golden Ticket request', signedGoldenTicketRequest)
+    if (WinFlags.VerboseLogs) console.log('Golden Ticket request', signedGoldenTicketRequest)
     const response = await shardusPost<AdminCertResponse>(network.current.goldenTicketServerUrl, signedGoldenTicketRequest, { timeout: 5000 })
-    if (LiberdusFlags.VerboseLogs) console.log('Golden Ticket response', response.data)
+    if (WinFlags.VerboseLogs) console.log('Golden Ticket response', response.data)
     if (response.data && response.data.success && response.data.ticket) {
       return {
         ticket: response.data.ticket,
@@ -155,7 +155,7 @@ export async function tryAndFetchGoldenTicket(publicKey: string, network: Networ
 
 /**
  * Fetches a Golden Ticket when the node has not requested one yet or its Golden Ticket has expired.
- * Retryable failures are retried after LiberdusFlags.goldenTicketRetryInterval; terminal failures stop retrying.
+ * Retryable failures are retried after WinFlags.goldenTicketRetryInterval; terminal failures stop retrying.
  */
 export async function fetchGoldenTicketIfNeeded(publicKey: string, network: NetworkAccount, dapp: Shardus): Promise<void> {
   const hasExpiredGoldenTicket = adminCert && adminCert.certExp <= dapp.shardusGetTime() && adminCert.goldenTicket === true
@@ -169,8 +169,8 @@ export async function fetchGoldenTicketIfNeeded(publicKey: string, network: Netw
       markRequestedAdminCert()
       isGoldenTicketRetry = false
       /* prettier-ignore */
-      if (LiberdusFlags.VerboseLogs) console.log(`fetched golden ticket: ${Utils.safeStringify(goldenTicketResult.ticket)}`)
-      nestedCountersInstance.countEvent('liberdus-staking', 'fetched golden ticket from server')
+      if (WinFlags.VerboseLogs) console.log(`fetched golden ticket: ${Utils.safeStringify(goldenTicketResult.ticket)}`)
+      nestedCountersInstance.countEvent('win-staking', 'fetched golden ticket from server')
       console.log(`Admin certificate is set to `, adminCert)
     } else if (goldenTicketResult.terminal) {
       // An expired ticket otherwise keeps hasExpiredGoldenTicket true and
@@ -179,25 +179,25 @@ export async function fetchGoldenTicketIfNeeded(publicKey: string, network: Netw
       markRequestedAdminCert()
       isGoldenTicketRetry = false
       /* prettier-ignore */
-      if (LiberdusFlags.VerboseLogs) console.log(`terminal golden ticket fetch error: ${goldenTicketResult.error}`)
-      nestedCountersInstance.countEvent('liberdus-staking', 'terminal golden ticket fetch error')
+      if (WinFlags.VerboseLogs) console.log(`terminal golden ticket fetch error: ${goldenTicketResult.error}`)
+      nestedCountersInstance.countEvent('win-staking', 'terminal golden ticket fetch error')
     } else {
       scheduleGoldenTicketRetry(dapp)
       /* prettier-ignore */
-      if (LiberdusFlags.VerboseLogs) console.log(`no golden ticket available from server, retrying in ${LiberdusFlags.goldenTicketRetryInterval}ms`)
-      nestedCountersInstance.countEvent('liberdus-staking', 'no golden ticket available from server, retry scheduled')
+      if (WinFlags.VerboseLogs) console.log(`no golden ticket available from server, retrying in ${WinFlags.goldenTicketRetryInterval}ms`)
+      nestedCountersInstance.countEvent('win-staking', 'no golden ticket available from server, retry scheduled')
     }
   } catch (e) {
     scheduleGoldenTicketRetry(dapp)
     /* prettier-ignore */
-    if (logFlags.error) console.log(`Error fetching golden ticket: ${e.message}; retrying in ${LiberdusFlags.goldenTicketRetryInterval}ms`) // non fatal
+    if (logFlags.error) console.log(`Error fetching golden ticket: ${e.message}; retrying in ${WinFlags.goldenTicketRetryInterval}ms`) // non fatal
   } finally {
     isGoldenTicketFetchInProgress = false
   }
 }
 
 function scheduleGoldenTicketRetry(dapp: Shardus): void {
-  nextGoldenTicketRetryAt = dapp.shardusGetTime() + LiberdusFlags.goldenTicketRetryInterval
+  nextGoldenTicketRetryAt = dapp.shardusGetTime() + WinFlags.goldenTicketRetryInterval
   isGoldenTicketRetry = true
 }
 

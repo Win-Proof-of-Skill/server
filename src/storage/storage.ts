@@ -1,7 +1,7 @@
 //import Log4js from 'log4js'
 
 import models from './models'
-import { LiberdusFlags } from './../config'
+import { WinFlags } from './../config'
 import Sqlite3Storage from './sqlite3storage'
 import { Op } from './utils/sqlOpertors'
 import { Accounts } from '../@types'
@@ -38,15 +38,15 @@ class Storage {
   }
 
   async init(): Promise<void> {
-    console.log('liberdus storage init:' + this.storage.dbPath)
+    console.log('win storage init:' + this.storage.dbPath)
     await this.storage.init()
-    console.log('liberdus storage init complete:')
+    console.log('win storage init complete:')
 
     await this.storage.runCreate(
       'CREATE TABLE if not exists `accountsEntry` (`accountId` VARCHAR(255) NOT NULL, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, PRIMARY KEY (`accountId`))',
     )
 
-    if (LiberdusFlags.NewStorageIndex) {
+    if (WinFlags.NewStorageIndex) {
       //add index to timestamp
       await this.storage.run('CREATE INDEX IF NOT EXISTS timestamp1 ON accountsEntry(timestamp)')
     }

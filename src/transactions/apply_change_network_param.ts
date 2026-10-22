@@ -59,13 +59,13 @@ export const apply = (
 export function backfillNetworkAccount(network: NetworkAccount): void {
   stripRetiredState(network)
 
-  if (config.LiberdusFlags.enableNewDAOTransactions === true) {
+  if (config.WinFlags.enableNewDAOTransactions === true) {
     if (network.current.dao == null) {
       network.current.dao = config.INITIAL_PARAMETERS.dao
     }
   }
 
-  if (config.LiberdusFlags.versionFlags.addNewNetworkParameters === true) {
+  if (config.WinFlags.versionFlags.addNewNetworkParameters === true) {
     if (network.current.nodeRewardAmountUsdStr === undefined || network.current.nodeRewardAmountUsdStr === null) {
       network.current.nodeRewardAmountUsdStr = '1.0'
       network.current.nodePenaltyUsdStr = '10.0'

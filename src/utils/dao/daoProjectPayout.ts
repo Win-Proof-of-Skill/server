@@ -12,7 +12,7 @@ const WEI = 10n ** 18n
  */
 export function usdToWeiAtRate(usdStr: string, rateUsdStr: string): bigint {
   const rate = ethers.parseEther(rateUsdStr)
-  if (rate === 0n) throw new Error('Project rate is zero; cannot convert USD to LIB')
+  if (rate === 0n) throw new Error('Project rate is zero; cannot convert USD to WIN')
   return (ethers.parseEther(usdStr) * WEI) / rate
 }
 

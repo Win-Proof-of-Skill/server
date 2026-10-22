@@ -101,7 +101,7 @@ export const apply = (
   const chat: ChatAccount = wrappedStates[tx.chatId].data
   const network = AccountsStorage.cachedNetworkAccount
 
-  if (config.LiberdusFlags.VerboseLogs) {
+  if (config.WinFlags.VerboseLogs) {
     dapp.log(`Applying message tx: ${txId}`, tx, from, to, chat)
   }
 

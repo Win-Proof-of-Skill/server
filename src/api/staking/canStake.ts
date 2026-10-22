@@ -1,5 +1,5 @@
 import { NodeAccount } from '../../@types'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { isRestakingAllowed } from '../../transactions/staking/deposit_stake'
 import { nestedCountersInstance, Shardus } from '@shardus/core'
 
@@ -18,7 +18,7 @@ export const canStake =
 
       res.json({ stakeAllowed })
     } catch (e) {
-      if (LiberdusFlags.VerboseLogs) console.log(`Error /canStake`, e)
+      if (WinFlags.VerboseLogs) console.log(`Error /canStake`, e)
       nestedCountersInstance.countEvent('canStake-api-error', e.message)
       res.status(500).send(e.message)
     }

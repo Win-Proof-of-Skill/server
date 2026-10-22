@@ -1,6 +1,6 @@
 import { ethers } from 'ethers'
 import * as ShardusCrypto from '@shardus/lib-crypto-utils'
-import { LiberdusFlags } from '../config'
+import { WinFlags } from '../config'
 import { ShardusTypes } from '@shardus/core'
 import { toShardusAddress } from '../utils/address'
 
@@ -14,7 +14,7 @@ export const init = ShardusCrypto.init
 export const setCustomStringifier = ShardusCrypto.setCustomStringifier
 
 export function verifyObj(obj: SignedObj, shardusSignature = false): boolean {
-  if (LiberdusFlags.useEthereumAddress && !shardusSignature) {
+  if (WinFlags.useEthereumAddress && !shardusSignature) {
     if (typeof obj !== 'object') {
       throw new TypeError('Input must be an object.')
     }
@@ -36,7 +36,7 @@ export function verifyObj(obj: SignedObj, shardusSignature = false): boolean {
     const recoveredShardusAddress = toShardusAddress(recoveredAddress)
     const isValid = recoveredShardusAddress.toLowerCase() === owner.toLowerCase()
 
-    if (LiberdusFlags.VerboseLogs) {
+    if (WinFlags.VerboseLogs) {
       console.log('Signed Obj', obj)
       console.log('Signature verification result:')
       console.log('Is Valid:', isValid)

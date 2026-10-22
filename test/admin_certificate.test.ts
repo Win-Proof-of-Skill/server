@@ -121,7 +121,7 @@ describe('Golden Ticket fetch lifecycle', () => {
   let lifecycleDapp: Shardus
   let post: jest.Mock
   let adminCertificate: typeof import('../src/transactions/admin_certificate')
-  let liberdusFlags: typeof import('../src/config').LiberdusFlags
+  let winFlags: typeof import('../src/config').WinFlags
 
   const ticketExpiringAt = (certExp: number): AdminCert => ({ ...ticket, certCreation: now, certExp })
   const retryableFailure = (): Error => new Error('connect ECONNREFUSED 127.0.0.1:3456')
@@ -135,10 +135,10 @@ describe('Golden Ticket fetch lifecycle', () => {
     jest.resetModules()
     // Fresh module instances so the retry state starts clean for every test
     adminCertificate = await import('../src/transactions/admin_certificate')
-    liberdusFlags = (await import('../src/config')).LiberdusFlags
+    winFlags = (await import('../src/config')).WinFlags
     post = (await import('../src/utils/request')).shardusPost as jest.Mock
     post.mockReset()
-    liberdusFlags.goldenTicketRetryInterval = retryInterval
+    winFlags.goldenTicketRetryInterval = retryInterval
     now = 1_000_000
     lifecycleDapp = {
       shardusGetTime: jest.fn(() => now),

@@ -2,7 +2,7 @@ import { VectorBufferStream } from '@shardus/core'
 import { Utils } from '@shardus/lib-types'
 import { nodeAccount, serializeNodeAccount, deserializeNodeAccount } from '../../../src/accounts/nodeAccount'
 import { deserializeAccounts, SerdeTypeIdent, serializeAccounts } from '../../../src/accounts/index'
-import { LiberdusFlags } from '../../../src/config'
+import { WinFlags } from '../../../src/config'
 import * as crypto from '../../../src/crypto'
 
 import { NodeAccount } from '../../../src/@types'
@@ -39,7 +39,7 @@ const encode = (account: NodeAccount): Buffer => {
 const decode = (buffer: Buffer): NodeAccount => deserializeNodeAccount(VectorBufferStream.fromBuffer(buffer), true)
 
 describe('NodeAccount Serialization', () => {
-  const originalFlag = LiberdusFlags.versionFlags.removeUnusedTxState
+  const originalFlag = WinFlags.versionFlags.removeUnusedTxState
 
   beforeAll(() => {
     crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
@@ -47,11 +47,11 @@ describe('NodeAccount Serialization', () => {
   })
 
   afterEach(() => {
-    LiberdusFlags.versionFlags.removeUnusedTxState = originalFlag
+    WinFlags.versionFlags.removeUnusedTxState = originalFlag
   })
 
   test('should serialize with root true', () => {
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
     const obj: NodeAccount = nodeAccount('test')
 
     const stream = new VectorBufferStream(0)
@@ -78,7 +78,7 @@ describe('NodeAccount Serialization', () => {
 
   test('default retired slots match the pre-removal bytes with either flag setting', () => {
     for (const active of [false, true]) {
-      LiberdusFlags.versionFlags.removeUnusedTxState = active
+      WinFlags.versionFlags.removeUnusedTxState = active
       const input = active ? strippedAccount() : legacyAccount()
       const encoded = encode(input)
       expect(encoded.toString('hex')).toBe(defaultAccountHex)

@@ -6,9 +6,15 @@ import minimist from 'minimist'
 import { NetworkParameters } from '../@types'
 import { Utils } from '@shardus/lib-types'
 import { DevSecurityLevel, ShardusTypes } from '@shardus/core'
-import { libToWei } from '../utils/units'
+import { wintoWei } from '../utils/units'
 
 export const networkAccount = '0'.repeat(64)
+
+export const profilesAddress = '1'+'0'.repeat(63)
+export const skillsAddress = '2'+'0'.repeat(63)
+export const contractsAddress = '3'+'0'.repeat(63)
+export const endorsmentsAddress = '4'+'0'.repeat(63)
+export const scoresAddress = '5'+'0'.repeat(63)
 
 // HELPFUL TIME CONSTANTS IN MILLISECONDS
 export const ONE_SECOND = 1000
@@ -28,13 +34,13 @@ const daoClaimDurationMs = process.env.DAO_CLAIM_DURATION_MS ? Number(process.en
 export const cycleDuration = process.env.CYCLE_DURATION ? Number(process.env.CYCLE_DURATION) : 60
 const reduceTimeFromTxTimestamp = cycleDuration * ONE_SECOND
 
-// INITIAL NETWORK PARAMETERS FOR LIBERDUS
+// INITIAL NETWORK PARAMETERS FOR WIN
 export const INITIAL_PARAMETERS: NetworkParameters = {
   title: 'Initial parameters',
-  description: 'These are the initial network parameters liberdus started with',
+  description: 'These are the initial network parameters win started with',
   nodeRewardInterval: ONE_HOUR, //ONE_HOUR,
   maintenanceInterval: ONE_DAY,
-  maintenanceFee: libToWei(0),
+  maintenanceFee: wintoWei(0),
   restakeCooldown: 30 * ONE_MINUTE,
   tollNetworkTaxPercent: 1, // 1%
   tollTimeout: 7 * ONE_DAY,
@@ -84,10 +90,6 @@ export const INITIAL_PARAMETERS: NetworkParameters = {
     claimDuration: daoClaimDurationMs,
     committeeAddresses: [
       '29fade38139aa68def5590ec433c48c33b478ebf000000000000000000000000',
-      'd268b0edcc39b9e54d11453c3a1e9b5f5eff31e0000000000000000000000000',
-      '00447504874e7300713133f04d9c58dbb17a9c43000000000000000000000000',
-      'bfd7173582ba21a4e78973763a13c0b819c69ff3000000000000000000000000',
-      'cda7a371d648ec626ca4ff41a30ffc85283b594d000000000000000000000000',
     ],
   },
 }
@@ -194,14 +196,14 @@ export function overrideDefaultConfig(defaultConfig, env: NodeJS.ProcessEnv, arg
 }
 
 export const enum FilePaths {
-  LIBERDUS_DB = 'db/liberdus.sqlite',
+  WIN_DB = 'db/win.sqlite',
   DB = 'db.sqlite',
   CONFIG = 'config.json',
   CLI_PACKAGE = '/home/node/app/cli/package.json',
   GUI_PACKAGE = '/home/node/app/gui/package.json',
 }
 
-interface LiberdusFlags {
+interface WinFlags {
   VerboseLogs: boolean
   NewStorageIndex: boolean
   UseDBForAccounts: boolean //Use Sql to store in memory accounts instead of simple accounts object map
@@ -241,8 +243,8 @@ interface LiberdusFlags {
   // project at creation, so a project is judged by the rules it was created under.
   daoProjectDurationBonusPercentage: number
   daoProjectDurationPenaltyPercentage: number
-  // Ceiling on the LIB a single project may mint at dao_project_start, as a decimal string so the
-  // value stays JSON-safe over /debug-liberdus-flags and exact when parsed to wei.
+  // Ceiling on the WIN a single project may mint at dao_project_start, as a decimal string so the
+  // value stays JSON-safe over /debug-win-flags and exact when parsed to wei.
   //
   // PLACEHOLDER VALUE — set from tokenomics before this reaches a real network.
   //
@@ -251,7 +253,7 @@ interface LiberdusFlags {
   // yet, so N projects can each pass this and still mint arbitrarily much in aggregate.
   // TODO: add the current_supply term once the network maintains it, and move this onto the network
   // account so governance can tune it (behind a version flag).
-  daoMaxMintThresholdLibStr: string
+  daoMaxMintThresholdWinStr: string
   // How long after a project ends before the committee may reclaim an unclaimed balance.
   daoProjectReclaimDelayMs: number
   minCommitteeMembers: number
@@ -270,7 +272,7 @@ interface LiberdusFlags {
     addNewNetworkParameters: boolean
     removeOperatorStatsHistory: boolean
     nodeRewardedStatusCheck: boolean
-    weiToLibStringFormat: boolean
+    weiToWinStringFormat: boolean
     includeTxToKeyInReadTx: boolean
     updateTollRequiredTxInChatHistory: boolean
     supportDeductTxFeeFromAmount: boolean
@@ -280,7 +282,7 @@ interface LiberdusFlags {
   }
 }
 
-export const LiberdusFlags: LiberdusFlags = {
+export const WinFlags: WinFlags = {
   NewStorageIndex: true,
   UseDBForAccounts: true,
   numberOfLuckyNodes: 1,
@@ -312,7 +314,7 @@ export const LiberdusFlags: LiberdusFlags = {
   daoMaxProposalGracePeriodMs: 30 * ONE_DAY,
   daoProjectDurationBonusPercentage: 20,
   daoProjectDurationPenaltyPercentage: 20,
-  daoMaxMintThresholdLibStr: '1000000',
+  daoMaxMintThresholdWinStr: '1000000',
   daoProjectReclaimDelayMs: 90 * ONE_DAY,
   minCommitteeMembers: 4,
   maxCommitteeMembers: 10,
@@ -330,7 +332,7 @@ export const LiberdusFlags: LiberdusFlags = {
     addNewNetworkParameters: true, // turn on by 2.4.1
     removeOperatorStatsHistory: true, // turn on by 2.4.5
     nodeRewardedStatusCheck: true, // turn on by 2.4.8
-    weiToLibStringFormat: true, // turn on by 2.4.8
+    weiToWinStringFormat: true, // turn on by 2.4.8
     includeTxToKeyInReadTx: true, // turn on by 2.4.8
     updateTollRequiredTxInChatHistory: true, // turn on by 2.4.9
     supportDeductTxFeeFromAmount: true, // turn on by 2.4.9
@@ -340,21 +342,21 @@ export const LiberdusFlags: LiberdusFlags = {
   },
 }
 
-export function updateLiberdusFlag(key: string, value: string | number | boolean): void {
+export function updateWinFlag(key: string, value: string | number | boolean): void {
   /* eslint-disable security/detect-object-injection */
   try {
-    if (LiberdusFlags[key] == null) {
-      console.log(`There is no liberdus flag for ${key}`)
+    if (WinFlags[key] == null) {
+      console.log(`There is no win flag for ${key}`)
       return
     }
-    if (typeof LiberdusFlags[key] !== typeof value) {
+    if (typeof WinFlags[key] !== typeof value) {
       console.log(`Type of new value is different from the type of existing flag ${key}`)
       return
     }
-    LiberdusFlags[key] = value
-    console.log(`Liberdus flag ${key} is set to ${value}`)
+    WinFlags[key] = value
+    console.log(`Win flag ${key} is set to ${value}`)
   } catch (e) {
-    console.log(`Error: updateLiberdusFlag`, e)
+    console.log(`Error: updateWinFlag`, e)
   }
   /* eslint-enable security/detect-object-injection */
 }

@@ -9,7 +9,7 @@
 FROM node:20.19.3
 
 # Link this Dockerfile to the image in the GHCR
-LABEL "org.opencontainers.image.source"="https://github.com/liberdus/server"
+LABEL "org.opencontainers.image.source"="https://github.com/win/server"
 
 # Create app directory
 WORKDIR /usr/src/app

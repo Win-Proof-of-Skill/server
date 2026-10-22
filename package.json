@@ -1,11 +1,11 @@
 {
-  "name": "liberdus",
+  "name": "win",
   "version": "2.5.2",
-  "description": "Liberdus is a payment network that allows users to govern their own money system in a democratic fashion",
+  "description": "Win is a payment network that allows users to govern their own money system in a democratic fashion",
   "main": "dist/index.js",
   "scripts": {
-    "build-client": "npm explore liberdus-web-client -- npm install && npm explore liberdus-web-client -- npm run build",
-    "run-client": "npm explore liberdus-web-client -- npm start",
+    "build-client": "npm explore win-web-client -- npm install && npm explore win-web-client -- npm run build",
+    "run-client": "npm explore win-web-client -- npm start",
     "start-client": "shardus pm2 start npm -- run run-client",
     "stop-client": "shardus pm2 stop npm",
     "start": "(shardus clean || true) && npm run build-client && shardus start 10 && npm run start-client && echo \"\nmonitor:    http://localhost:3000\nweb-client: http://localhost:3333\nexplorer:   http://localhost:4444\"",
@@ -23,10 +23,10 @@
     "posttest": "npm run check",
     "test:dao:e2e": "bash scripts/run-dao-e2e.sh",
     "dbg": "shardus start 3 && shardus stop && rm -rf instances/",
-    "build-docker-dev": "sudo docker build -f dev.Dockerfile -t ghcr.io/liberdus/server:dev .",
-    "push-docker-dev": "sudo docker push ghcr.io/liberdus/server:dev",
-    "build-docker-production": "sudo docker build -f dev.Dockerfile -t ghcr.io/liberdus/server:latest .",
-    "push-docker-production": "sudo docker push ghcr.io/liberdus/server:latest"
+    "build-docker-dev": "sudo docker build -f dev.Dockerfile -t ghcr.io/win/server:dev .",
+    "push-docker-dev": "sudo docker push ghcr.io/win/server:dev",
+    "build-docker-production": "sudo docker build -f dev.Dockerfile -t ghcr.io/win/server:latest .",
+    "push-docker-production": "sudo docker push ghcr.io/win/server:latest"
   },
   "author": "Kyle Shifflett",
   "license": "ISC",
@@ -54,7 +54,7 @@
     "ajv": "^6.12.6"
   },
   "devDependencies": {
-    "@shardus/archiver": "github:Liberdus/archiver#v3.8.3",
+    "@shardus/archiver": "github:Win-Proof-of-Skill/archiver#v1.0.0",
     "@shardus/monitor-server": "2.8.12",
     "@types/decimal.js": "^7.4.0",
     "@types/express": "^4.17.2",

@@ -119,7 +119,7 @@ export const apply = (
         totalNodeReward: BigInt(0),
         totalNodePenalty: BigInt(0),
         totalNodeTime: 0,
-        ...(!config.LiberdusFlags.versionFlags.removeOperatorStatsHistory && { history: [] }),
+        ...(!config.WinFlags.versionFlags.removeOperatorStatsHistory && { history: [] }),
         totalUnstakeReward: BigInt(0),
         unstakeCount: 0,
         lastStakedNodeKey: '',

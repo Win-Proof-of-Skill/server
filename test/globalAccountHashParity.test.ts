@@ -1,6 +1,6 @@
 import { Shardus, ShardusTypes } from '@shardus/core'
 import { Utils } from '@shardus/lib-types'
-import { INITIAL_PARAMETERS, LiberdusFlags, networkAccount as networkAccountId } from '../src/config'
+import { INITIAL_PARAMETERS, WinFlags, networkAccount as networkAccountId } from '../src/config'
 import { Accounts, DevAccount, NetworkAccount, OurAppDefinedData, Tx, TXTypes, WrappedStates } from '../src/@types'
 import * as crypto from '../src/crypto'
 import * as utils from '../src/utils'
@@ -20,9 +20,9 @@ import { daoProposalsMetaId } from '../src/accounts/daoProposalsMetaAccount'
  */
 describe('global network-account afterStateHash parity', () => {
   const devAddress = 'a'.repeat(64)
-  const originalFlag = LiberdusFlags.versionFlags.removeLegacyDaoState
-  const originalUnusedFlag = LiberdusFlags.versionFlags.removeUnusedTxState
-  const originalNetworkParamsFlag = LiberdusFlags.versionFlags.removeLegacyNetworkParams
+  const originalFlag = WinFlags.versionFlags.removeLegacyDaoState
+  const originalUnusedFlag = WinFlags.versionFlags.removeUnusedTxState
+  const originalNetworkParamsFlag = WinFlags.versionFlags.removeLegacyNetworkParams
   const retiredNetworkParamKeys = [
     'transactionFee',
     'faucetAmount',
@@ -43,9 +43,9 @@ describe('global network-account afterStateHash parity', () => {
   const originalCachedNetworkAccount = AccountsStorage.cachedNetworkAccount
 
   afterEach(() => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = originalFlag
-    LiberdusFlags.versionFlags.removeUnusedTxState = originalUnusedFlag
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = originalNetworkParamsFlag
+    WinFlags.versionFlags.removeLegacyDaoState = originalFlag
+    WinFlags.versionFlags.removeUnusedTxState = originalUnusedFlag
+    WinFlags.versionFlags.removeLegacyNetworkParams = originalNetworkParamsFlag
     // assertParity overwrites this module global; put it back so the suite is self-contained.
     AccountsStorage.setCachedNetworkAccount(originalCachedNetworkAccount)
   })
@@ -63,7 +63,7 @@ describe('global network-account afterStateHash parity', () => {
       listOfChanges: [],
       current: {
         ...utils.deepCopy(INITIAL_PARAMETERS),
-        activeVersion: LiberdusFlags.versionFlags.removeLegacyNetworkParams ? '2.5.2' : '2.5.1',
+        activeVersion: WinFlags.versionFlags.removeLegacyNetworkParams ? '2.5.2' : '2.5.1',
         proposalFee: 50n,
         devProposalFee: 50n,
         transactionFee: 10n ** 17n,
@@ -135,7 +135,7 @@ describe('global network-account afterStateHash parity', () => {
     ;(applyHandler.apply as any)(value, when, 'global-tx-id', wrap(applied), stubDapp(), applyResponse)
 
     for (const key of retiredNetworkParamKeys) {
-      expect(Object.prototype.hasOwnProperty.call(applied.current, key)).toBe(!LiberdusFlags.versionFlags.removeLegacyNetworkParams)
+      expect(Object.prototype.hasOwnProperty.call(applied.current, key)).toBe(!WinFlags.versionFlags.removeLegacyNetworkParams)
     }
     expect(applied.current.maintenanceInterval).toBe(INITIAL_PARAMETERS.maintenanceInterval)
     expect(applied.current.maintenanceFee).toBe(INITIAL_PARAMETERS.maintenanceFee)
@@ -215,9 +215,9 @@ describe('global network-account afterStateHash parity', () => {
 
   describe('with the 2.5.2 migration active', () => {
     beforeEach(() => {
-      LiberdusFlags.versionFlags.removeLegacyDaoState = true
-      LiberdusFlags.versionFlags.removeUnusedTxState = true
-      LiberdusFlags.versionFlags.removeLegacyNetworkParams = true
+      WinFlags.versionFlags.removeLegacyDaoState = true
+      WinFlags.versionFlags.removeUnusedTxState = true
+      WinFlags.versionFlags.removeLegacyNetworkParams = true
     })
 
     test('change_config promises the hash apply_change_config produces', () => {
@@ -241,9 +241,9 @@ describe('global network-account afterStateHash parity', () => {
 
   describe('before the 2.5.2 migration activates', () => {
     beforeEach(() => {
-      LiberdusFlags.versionFlags.removeLegacyDaoState = false
-      LiberdusFlags.versionFlags.removeUnusedTxState = false
-      LiberdusFlags.versionFlags.removeLegacyNetworkParams = false
+      WinFlags.versionFlags.removeLegacyDaoState = false
+      WinFlags.versionFlags.removeUnusedTxState = false
+      WinFlags.versionFlags.removeLegacyNetworkParams = false
     })
 
     test('change_config parity holds with retired state still present', () => {

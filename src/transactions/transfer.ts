@@ -33,11 +33,11 @@ export const validate_fields = (tx: Tx.Transfer, response: ShardusTypes.Incoming
     response.reason = 'tx "memo" field must be a string.'
     return response
   }
-  if (tx.memo && tx.memo.length > config.LiberdusFlags.transferMemoLimit) {
-    response.reason = `tx "memo" size must be less than ${config.LiberdusFlags.transferMemoLimit} characters.`
+  if (tx.memo && tx.memo.length > config.WinFlags.transferMemoLimit) {
+    response.reason = `tx "memo" size must be less than ${config.WinFlags.transferMemoLimit} characters.`
     return response
   }
-  if (config.LiberdusFlags.versionFlags.supportDeductTxFeeFromAmount === true) {
+  if (config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true) {
     if (tx.deductTxFeeFromAmount !== undefined && typeof tx.deductTxFeeFromAmount !== 'boolean') {
       response.reason = 'tx "deductTxFeeFromAmount" field must be a boolean.'
       return response
@@ -104,7 +104,7 @@ export const validate = (
 
   const transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
   const deductTxFeeFromAmount =
-    config.LiberdusFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
+    config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
     tx.deductTxFeeFromAmount === true
 
   if (deductTxFeeFromAmount === false && from.data.balance < tx.amount + transactionFee) {
@@ -122,7 +122,7 @@ export const validate = (
     }
   }
   // if there is a memo, check if the amount is larger than the Toll required for the chat
-  if (config.LiberdusFlags.versionFlags.minTransferAmountCheck) {
+  if (config.WinFlags.versionFlags.minTransferAmountCheck) {
     const hasMemo = (tx.memo && tx.memo.length > 0) || (tx.xmemo && tx.xmemo.message && tx.xmemo.message.length > 0)
     console.log('hasMemo', tx, hasMemo)
     let shouldSendMinToll = false
@@ -153,7 +153,7 @@ export const validate = (
         tollInWei = utils.usdToWei(to.data.toll, network) // legit use cos' we don't store toll in string format
       }
       if (tx.amount < tollInWei) {
-        response.reason = `You must send at least ${utils.weiToLib(tollInWei)} LIB to this user.`
+        response.reason = `You must send at least ${utils.weiToWin(tollInWei)} WIN to this user.`
         return response
       }
     }
@@ -189,7 +189,7 @@ export const apply = (
   const transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
   const maintenanceFee = utils.maintenanceAmount(txTimestamp, from, network)
   const deductTxFeeFromAmount =
-    config.LiberdusFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
+    config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
     tx.deductTxFeeFromAmount === true
   if (deductTxFeeFromAmount === false) {
     from.data.balance = SafeBigIntMath.subtract(from.data.balance, transactionFee)

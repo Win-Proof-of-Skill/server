@@ -1,6 +1,6 @@
 import { nestedCountersInstance, Shardus, ShardusTypes } from '@shardus/core'
 import { logFlags } from '@shardus/core/dist/logger'
-import { LiberdusFlags, ONE_SECOND } from '../../config'
+import { WinFlags, ONE_SECOND } from '../../config'
 import {
   NodeAccount,
   ViolationType,
@@ -79,64 +79,64 @@ export async function injectPenaltyTX(
   // store the unsignedTx to local map for later use
   recordPenaltyTX(txId, signedTx)
 
-  // Limit the nodes that send this to the <LiberdusFlags.numberOfNodesToInjectPenaltyTx> closest to the node address ( publicKey )
-  const closestNodes = dapp.getClosestNodes(eventData.publicKey, LiberdusFlags.numberOfNodesToInjectPenaltyTx)
+  // Limit the nodes that send this to the <WinFlags.numberOfNodesToInjectPenaltyTx> closest to the node address ( publicKey )
+  const closestNodes = dapp.getClosestNodes(eventData.publicKey, WinFlags.numberOfNodesToInjectPenaltyTx)
   const ourId = dapp.getNodeId()
   const isLuckyNode = closestNodes.some((nodeId) => nodeId === ourId)
   if (!isLuckyNode) {
-    if (LiberdusFlags.VerboseLogs) console.log(`injectPenaltyTX: not lucky node, skipping injection`, signedTx)
+    if (WinFlags.VerboseLogs) console.log(`injectPenaltyTX: not lucky node, skipping injection`, signedTx)
     return { success: false, reason: 'not lucky node', status: 404 }
   }
   const waitTime = futureTimestamp - dapp.shardusGetTime()
   // since we have to pick a future timestamp, we need to wait until it is time to submit the signedTx
   await _sleep(waitTime)
 
-  if (LiberdusFlags.VerboseLogs) {
+  if (WinFlags.VerboseLogs) {
     console.log(`injectPenaltyTX: tx.timestamp: ${signedTx.timestamp} txid: ${txId}`, signedTx)
   }
 
   const result = await dapp.put(signedTx)
-  if (LiberdusFlags.VerboseLogs) dapp.log('INJECTED_PENALTY_TX', result)
+  if (WinFlags.VerboseLogs) dapp.log('INJECTED_PENALTY_TX', result)
   return result
 }
 
 export const validate_fields = (tx: Tx.PenaltyTX, response: ShardusTypes.IncomingTransactionResult): ShardusTypes.IncomingTransactionResult => {
   if (isValidAddress(tx.reportedNodeId) === false) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.reportedNodeId address invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.reportedNodeId address invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.reportedNodeId address invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.reportedNodeId address invalid`, tx)
     response.reason = 'Invalid reportedNode ID'
     return response
   }
   if (isValidAddress(tx.reportedNodePublickKey) === false) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.reportedNode publicKey invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.reportedNode publicKey invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.reportedNode publicKey invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.reportedNode publicKey invalid`, tx)
     response.reason = 'Invalid reportedNode public key'
     return response
   }
   if (isValidAddress(tx.nominator) === false) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.nominator address invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.nominator address invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.nominator address invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.nominator address invalid`, tx)
     response.reason = 'Invalid nominator address'
     return response
   }
-  if (tx.violationType < ViolationType.LiberdusMinID || tx.violationType > ViolationType.LiberdusMaxID) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.violationType invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.violationType invalid`, tx)
+  if (tx.violationType < ViolationType.WinMinID || tx.violationType > ViolationType.WinMaxID) {
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.violationType invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.violationType invalid`, tx)
     response.reason = 'Invalid violation type'
     return response
   }
   if (!tx.violationData) {
     //TODO validate violation data using violation types
 
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.violationData invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.violationData invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.violationData invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.violationData invalid`, tx)
     response.reason = 'Invalid violation data'
     return response
   }
 
   if (tx.timestamp <= 0) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.timestamp invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.timestamp invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.timestamp invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.timestamp invalid`, tx)
     response.reason = 'Invalid timestamp'
     return response
   }
@@ -161,13 +161,13 @@ export const validate_fields = (tx: Tx.PenaltyTX, response: ShardusTypes.Incomin
   }
   const isValid = crypto.verifyObj(tx, true)
   if (!isValid) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.signature invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.signature invalid`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.signature invalid`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.signature invalid`, tx)
     response.reason = 'Invalid signature'
     return response
   }
-  if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX success`, tx)
-  nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX success`)
+  if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX success`, tx)
+  nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX success`)
   response.success = true
   return response
 }
@@ -178,24 +178,24 @@ export const validate = (
   response: ShardusTypes.IncomingTransactionResult,
   dapp: Shardus,
 ): ShardusTypes.IncomingTransactionResult => {
-  if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX`, tx)
+  if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX`, tx)
   const nodeAccount = wrappedStates[tx.reportedNodePublickKey].data as NodeAccount
   const operatorAccount = wrappedStates[tx.nominator].data as UserAccount
   if (!isNodeAccount(nodeAccount)) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail reported node address is not a NodeAccount`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail reported node address is not a NodeAccount`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail reported node address is not a NodeAccount`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail reported node address is not a NodeAccount`, tx)
     response.reason = 'reported node address is not a NodeAccount'
     return response
   }
   if (!isUserAccount(operatorAccount)) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail operatorAccount is not a UserAccount`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail operatorAccount is not a UserAccount`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail operatorAccount is not a UserAccount`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail operatorAccount is not a UserAccount`, tx)
     response.reason = 'nominator account is not a UserAccount'
     return response
   }
   if (nodeAccount.nominator !== tx.nominator) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail tx.nominator does not match`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.nominator does not match`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail tx.nominator does not match`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail tx.nominator does not match`, tx)
     response.reason = 'tx.nominator does not match'
     return response
   }
@@ -217,16 +217,16 @@ export const validate = (
     eventTime = (tx.violationData as SyncingTimeoutViolationData).nodeDroppedTime
   }
   if (isProcessed) {
-    if (LiberdusFlags.VerboseLogs)
+    if (WinFlags.VerboseLogs)
       dapp.log(
         `Processed penaltyTX: for reportedNode ${tx.reportedNodePublickKey}, nominator ${tx.nominator}, violationType ${tx.violationType}, eventTime ${eventTime} vs lastPenaltyTime ${nodeAccount.nodeAccountStats.lastPenaltyTime}`,
       )
-    nestedCountersInstance.countEvent('liberdus-penalty', `validatePenaltyTX fail isProcessedPenaltyTx`)
-    if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX fail isProcessedPenaltyTx`, tx)
+    nestedCountersInstance.countEvent('win-penalty', `validatePenaltyTX fail isProcessedPenaltyTx`)
+    if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX fail isProcessedPenaltyTx`, tx)
     response.reason = 'Penalty TX already processed'
     return response
   }
-  if (LiberdusFlags.VerboseLogs) console.log(`validatePenaltyTX success`, tx)
+  if (WinFlags.VerboseLogs) console.log(`validatePenaltyTX success`, tx)
   response.success = true
   response.reason = 'This transaction is valid!'
   return response
@@ -240,7 +240,7 @@ export const apply = (
   dapp: Shardus,
   applyResponse: ShardusTypes.ApplyResponse,
 ): void => {
-  if (LiberdusFlags.VerboseLogs) console.log(`Running applyPenaltyTX`, tx, wrappedStates)
+  if (WinFlags.VerboseLogs) console.log(`Running applyPenaltyTX`, tx, wrappedStates)
   /* eslint-disable security/detect-object-injection */
   const nodeAccount = wrappedStates[tx.reportedNodePublickKey].data as NodeAccount
   const operatorAccount = wrappedStates[tx.nominator].data as UserAccount
@@ -285,7 +285,7 @@ export const apply = (
   nodeAccount.timestamp = txTimestamp
   nodeAccount.nodeAccountStats.lastPenaltyTime = eventTime
 
-  if (LiberdusFlags.VerboseLogs) console.log(`Calculating updated node penalty. nodePenaltyAmount: ${nodeAccount.penalty}`)
+  if (WinFlags.VerboseLogs) console.log(`Calculating updated node penalty. nodePenaltyAmount: ${nodeAccount.penalty}`)
 
   const appReceiptData: AppReceiptData = {
     txId,
@@ -302,8 +302,8 @@ export const apply = (
   const appReceiptDataHash = crypto.hashObj(appReceiptData)
   dapp.applyResponseAddReceiptData(applyResponse, appReceiptData, appReceiptDataHash)
 
-  nestedCountersInstance.countEvent('liberdus-penalty', `Applied PenaltyTX`)
-  if (LiberdusFlags.VerboseLogs) dapp.log('Applied PenaltyTX', tx.reportedNodePublickKey)
+  nestedCountersInstance.countEvent('win-penalty', `Applied PenaltyTX`)
+  if (WinFlags.VerboseLogs) dapp.log('Applied PenaltyTX', tx.reportedNodePublickKey)
 }
 
 export const createFailedAppReceiptData = (
@@ -340,14 +340,14 @@ export const transactionReceiptPass = async (
   const nodeAccount = wrappedStates[tx.reportedNodePublickKey].data as NodeAccount
 
   if (isLowStake(nodeAccount)) {
-    if (LiberdusFlags.VerboseLogs) console.log(`isLowStake for nodeAccount ${nodeAccount.id}: true`, nodeAccount)
-    // Limit the nodes that will get signs for remove node cert to <LiberdusFlags.numberOfNodesToInjectPenaltyTx>, which are closest to the low stake node address ( publicKey )
-    // [TODO] This will make <LiberdusFlags.numberOfNodesToInjectPenaltyTx> nodes get signs; we can implement a cache system in the signer nodes to store the recent remove node cert signs they have signed for performance ( NOT URGENT )
-    const closestNodes = dapp.getClosestNodes(tx.reportedNodePublickKey, LiberdusFlags.numberOfNodesToInjectPenaltyTx)
+    if (WinFlags.VerboseLogs) console.log(`isLowStake for nodeAccount ${nodeAccount.id}: true`, nodeAccount)
+    // Limit the nodes that will get signs for remove node cert to <WinFlags.numberOfNodesToInjectPenaltyTx>, which are closest to the low stake node address ( publicKey )
+    // [TODO] This will make <WinFlags.numberOfNodesToInjectPenaltyTx> nodes get signs; we can implement a cache system in the signer nodes to store the recent remove node cert signs they have signed for performance ( NOT URGENT )
+    const closestNodes = dapp.getClosestNodes(tx.reportedNodePublickKey, WinFlags.numberOfNodesToInjectPenaltyTx)
     const ourId = dapp.getNodeId()
     const isLuckyNode = closestNodes.some((nodeId) => nodeId === ourId)
     if (!isLuckyNode) {
-      if (LiberdusFlags.VerboseLogs) console.log(`isLowStake: not lucky node, skipping getting signs for remove node cert`, ourId, closestNodes)
+      if (WinFlags.VerboseLogs) console.log(`isLowStake: not lucky node, skipping getting signs for remove node cert`, ourId, closestNodes)
       return
     }
     const latestCycles = dapp.getLatestCycles()
@@ -365,13 +365,13 @@ export const transactionReceiptPass = async (
     const signedAppData = await dapp.getAppDataSignatures(
       'sign-remove-node-cert',
       crypto.hashObj(certData),
-      LiberdusFlags.MinRemoveNodeCertSig,
+      WinFlags.MinRemoveNodeCertSig,
       certData,
-      LiberdusFlags.ExtraNodesToSignRemoveNodeCert,
+      WinFlags.ExtraNodesToSignRemoveNodeCert,
     )
     if (!signedAppData.success) {
       nestedCountersInstance.countEvent('isLowStake', 'unable to get signs for remove node cert')
-      if (LiberdusFlags.VerboseLogs) console.log(`isLowStake: Unable to get signature for remove node cert`)
+      if (WinFlags.VerboseLogs) console.log(`isLowStake: Unable to get signature for remove node cert`)
       // todo: find a better way to retry this
       return
     }
@@ -419,11 +419,11 @@ function recordPenaltyTX(txId: string, tx: Tx.PenaltyTX): void {
 
 export function clearOldPenaltyTxs(dapp: Shardus): void {
   if (penaltyTxsMap.size === 0) {
-    nestedCountersInstance.countEvent('liberdus-penalty', `clearOldPenaltyTxs mapSize:0`)
+    nestedCountersInstance.countEvent('win-penalty', `clearOldPenaltyTxs mapSize:0`)
     return
   }
   let deleteCount = 0
-  nestedCountersInstance.countEvent('liberdus-penalty', `clearOldPenaltyTxs mapSize:${penaltyTxsMap.size}`)
+  nestedCountersInstance.countEvent('win-penalty', `clearOldPenaltyTxs mapSize:${penaltyTxsMap.size}`)
   const now = dapp.shardusGetTime()
   for (const [txId, tx] of penaltyTxsMap.entries()) {
     const cycleDuration = dapp.config.p2p.cycleDuration * 1000
@@ -432,18 +432,18 @@ export function clearOldPenaltyTxs(dapp: Shardus): void {
       deleteCount++
     }
   }
-  nestedCountersInstance.countEvent('liberdus-penalty', `clearOldPenaltyTxs deleteCount: ${deleteCount}`)
+  nestedCountersInstance.countEvent('win-penalty', `clearOldPenaltyTxs deleteCount: ${deleteCount}`)
 }
 
 export function isLowStake(nodeAccount: NodeAccount): boolean {
   /**
    * IMPORTANT FUTURE TO-DO =:
    * This function's logic needs to be updated once `stakeRequiredUsd` actually represents
-   * USD value rather than LIB.
+   * USD value rather than WIN.
    */
 
   const stakeRequiredUSD = getStakeRequiredWei(AccountsStorage.cachedNetworkAccount)
-  const lowStakeThresholdUSD = (stakeRequiredUSD * BigInt(LiberdusFlags.lowStakePercent * 100)) / BigInt(100)
+  const lowStakeThresholdUSD = (stakeRequiredUSD * BigInt(WinFlags.lowStakePercent * 100)) / BigInt(100)
   const lowStakeThreshold = lowStakeThresholdUSD
 
   return nodeAccount.stakeLock < lowStakeThreshold

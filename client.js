@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 /**
  * =============================================================================
- * Liberdus/Shardus client – interact with a node via the command line
+ * Win/Shardus client – interact with a node via the command line
  * =============================================================================
  *
  * USAGE
@@ -25,7 +25,7 @@
  *    - Run: register
  *    - When prompted "Enter the alias you want:", use the SAME name as the
  *      wallet (e.g. alice). This keeps wallet name and account alias in sync.
- *    - After registration, the account is eligible for faucet funding (e.g. 50 LIB).
+ *    - After registration, the account is eligible for faucet funding (e.g. 50 WIN).
  *    - Run: faucet
  *    - Follow the prompts; your account will be funded.
  *
@@ -39,7 +39,7 @@
  * 3. USE THE CURRENT WALLET
  *    - use <name>   – switch to wallet <name> (e.g. use alice, use bob).
  *
- * 4. TRANSFER LIB BETWEEN ACCOUNTS
+ * 4. TRANSFER WIN BETWEEN ACCOUNTS
  *    - transfer
  *    - Enter target: alias or address (e.g. bob or the full public key).
  *    - Enter amount and memo as prompted.
@@ -87,7 +87,7 @@ const devKey = {
 
 const useEthereumSigning = true
 
-// BEFORE TESTING LOCALLY, CHANGE THE ADMIN_ADDRESS IN LIBERDUS-SERVER TO ONE YOU HAVE LOCALLY
+// BEFORE TESTING LOCALLY, CHANGE THE ADMIN_ADDRESS IN WIN-SERVER TO ONE YOU HAVE LOCALLY
 let USER
 const PROTOCOL = 'http'
 let HOST = process.argv[2] || 'localhost:9001'
@@ -551,7 +551,7 @@ async function getToll(friendId, yourId) {
     const tollInWei = accountData.account.data.toll
     const tollUnit = accountData.account.data.tollUnit
     console.log(`Toll for ${friendId} is ${tollInWei} wei`)
-    return { toll: weiToLib(tollInWei), tollUnit }
+    return { toll: weiToWin(tollInWei), tollUnit }
   } catch (error) {
     return { error: error }
   }
@@ -788,7 +788,7 @@ vorpal.command('create', 'creates tokens for an account').action(async function 
     const tx = {
       type: 'create',
       from: to,
-      amount: libToWei(answers.amount),
+      amount: wintoWei(answers.amount),
       timestamp: Date.now(),
       networkId,
     }
@@ -823,7 +823,7 @@ vorpal.command('transfer', 'transfers tokens to another account').action(async f
     },
   ])
   const to = await getAddress(answers.target)
-  const amountInWei = libToWei(parseFloat(answers.amount))
+  const amountInWei = wintoWei(parseFloat(answers.amount))
   console.log(`Sending ${amountInWei} to ${to}`)
   const tx = {
     type: 'transfer',
@@ -858,7 +858,7 @@ vorpal.command('deposit stake', 'deposit the stake amount to the node').action(a
       filter: (value) => BigInt(value),
     },
   ])
-  const stakeAmount = libToWei(parseFloat(answers.amount))
+  const stakeAmount = wintoWei(parseFloat(answers.amount))
   const tx = {
     type: 'deposit_stake',
     nominator: USER.address,
@@ -1091,7 +1091,7 @@ vorpal.command('toll', 'sets a toll people must you in order to send you message
       type: 'string',
       name: 'tollUnit',
       message: 'Enter the unit of toll: ',
-      default: 'LIB',
+      default: 'WIN',
     },
     {
       type: 'number',
@@ -1103,7 +1103,7 @@ vorpal.command('toll', 'sets a toll people must you in order to send you message
   const tx = {
     type: 'toll',
     from: USER.address,
-    toll: libToWei(answer.toll),
+    toll: wintoWei(answer.toll),
     tollUnit: answer.tollUnit,
     timestamp: Date.now(),
   }
@@ -1143,7 +1143,7 @@ vorpal
   })
 
 // COMMAND TO SPAM THE NETWORK WITH A SPECIFIC TRANSACTION TYPE
-// TODO ADD LIBERDUS SPECIFIC TRANSACTIONS TO THIS
+// TODO ADD WIN SPECIFIC TRANSACTIONS TO THIS
 vorpal
   .command(
     'spam transactions <type> <accounts> <count> <tps> <ports>',
@@ -1291,7 +1291,7 @@ vorpal.command('check staked balances', 'check balances of staked accounts and s
     {
       type: 'number',
       name: 'minimumBalance',
-      message: 'Enter minimum balance threshold (LIB): ',
+      message: 'Enter minimum balance threshold (WIN): ',
       default: 100,
       filter: (value) => parseFloat(value),
     },
@@ -1307,7 +1307,7 @@ vorpal.command('check staked balances', 'check balances of staked accounts and s
       return
     }
 
-    this.log(`Checking ${nodeIds.length} staked accounts (minimum balance: ${answers.minimumBalance} LIB)...\n`)
+    this.log(`Checking ${nodeIds.length} staked accounts (minimum balance: ${answers.minimumBalance} WIN)...\n`)
 
     const lowBalanceAccounts = []
     const healthyAccounts = []
@@ -1324,11 +1324,11 @@ vorpal.command('check staked balances', 'check balances of staked accounts and s
         let balance = 0
 
         if (accountData && accountData.account && accountData.account.data) {
-          balance = weiToLib(accountData.account.data.balance || 0)
+          balance = weiToWin(accountData.account.data.balance || 0)
         }
 
         const status = balance >= answers.minimumBalance ? '✅' : '⚠️'
-        this.log(`${status} ${address.slice(0, 12)}... - ${balance.toFixed(2)} LIB`)
+        this.log(`${status} ${address.slice(0, 12)}... - ${balance.toFixed(2)} WIN`)
 
         if (balance < answers.minimumBalance) {
           lowBalanceAccounts.push({
@@ -1359,7 +1359,7 @@ vorpal.command('check staked balances', 'check balances of staked accounts and s
     if (lowBalanceAccounts.length > 0) {
       this.log(`\n💰 Accounts that need funding:`)
       for (const account of lowBalanceAccounts) {
-        this.log(`   ${account.address.slice(0, 12)}... needs ${account.needed.toFixed(2)} LIB`)
+        this.log(`   ${account.address.slice(0, 12)}... needs ${account.needed.toFixed(2)} WIN`)
       }
     }
   } catch (error) {
@@ -1396,8 +1396,8 @@ vorpal.command('show staked accounts', 'display information about staked account
       try {
         const accountData = await getAccountData(address)
         if (accountData && accountData.account && accountData.account.data) {
-          const balance = weiToLib(accountData.account.data.balance || 0)
-          this.log(`   Balance: ${balance} LIB`)
+          const balance = weiToWin(accountData.account.data.balance || 0)
+          this.log(`   Balance: ${balance} WIN`)
         } else {
           this.log(`   Balance: Account not found or no balance`)
         }
@@ -1488,10 +1488,10 @@ vorpal.command('deposit stake all', 'deposit the stake amount to the joining/act
   const nodesToStake = []
   for (const publicKey of nodeList) {
     const nodeAccount = await getAccountData(publicKey)
-    console.log(`Checking node: ${publicKey} with stakeLock: ${nodeAccount?.account?.stakeLock || 0}, required: ${libToWei(Number(answers.amount))}`)
+    console.log(`Checking node: ${publicKey} with stakeLock: ${nodeAccount?.account?.stakeLock || 0}, required: ${wintoWei(Number(answers.amount))}`)
 
     // Only include nodes that don't have sufficient stake
-    if (!nodeAccount || !nodeAccount.account || nodeAccount.account.stakeLock < libToWei(Number(answers.amount))) {
+    if (!nodeAccount || !nodeAccount.account || nodeAccount.account.stakeLock < wintoWei(Number(answers.amount))) {
       nodesToStake.push(publicKey)
     }
   }
@@ -1525,7 +1525,7 @@ vorpal.command('deposit stake all', 'deposit the stake amount to the joining/act
         type: 'create',
         from: newAccounts[i].address,
         to: newAccounts[i].address,
-        amount: libToWei(2000), // 2000 tokens
+        amount: wintoWei(2000), // 2000 tokens
         timestamp: Date.now(),
       }
       signTransaction(createTx, newAccounts[i].keys)
@@ -1554,7 +1554,7 @@ vorpal.command('deposit stake all', 'deposit the stake amount to the joining/act
         type: 'create',
         from: accountInfo.address,
         to: accountInfo.address,
-        amount: libToWei(2000), // 2000 tokens
+        amount: wintoWei(2000), // 2000 tokens
         timestamp: Date.now(),
       }
 
@@ -1584,7 +1584,7 @@ vorpal.command('deposit stake all', 'deposit the stake amount to the joining/act
         type: 'deposit_stake',
         nominator: accountInfo.address,
         nominee: nodeId,
-        stake: libToWei(parseFloat(answers.amount)),
+        stake: wintoWei(parseFloat(answers.amount)),
         timestamp: Date.now(),
       }
 
@@ -1606,7 +1606,7 @@ vorpal.command('deposit stake all', 'deposit the stake amount to the joining/act
         type: 'deposit_stake',
         nominator: account.address,
         nominee: nodeId,
-        stake: libToWei(parseFloat(answers.amount)),
+        stake: wintoWei(parseFloat(answers.amount)),
         timestamp: Date.now(),
       }
 
@@ -1769,7 +1769,7 @@ const loadAndFundStakedAccounts = async (fundAmount) => {
         type: 'create',
         from: accountInfo.address,
         to: accountInfo.address,
-        amount: libToWei(fundAmount),
+        amount: wintoWei(fundAmount),
         timestamp: Date.now(),
       }
 
@@ -1814,17 +1814,17 @@ const jsonStringifyReplacer = (key, value) => {
   return value
 }
 
-function libToWei(lib) {
-  return BigInt(lib * 10 ** 18)
+function wintoWei(won) {
+  return BigInt(win* 10 ** 18)
 }
 
-function weiToLib(wei) {
+function weiToWin(wei) {
   return Number(wei) / 10 ** 18
 }
 
-// Full-precision wei → LIB string using ethers.formatEther (avoids Number() truncation on large
+// Full-precision wei → WIN string using ethers.formatEther (avoids Number() truncation on large
 // BigInt values). Use this for all DAO display where exact amounts matter.
-function weiToLibStr(wei) {
+function weiToWinStr(wei) {
   try {
     return ethers.formatEther(BigInt(wei))
   } catch {
@@ -2194,7 +2194,7 @@ vorpal.command('dao vote', 'cast a community vote on a proposal').action(async f
     const stabilityFactorStr = await getStabilityFactorStr()
     const minimumSpendWei = usdStrToWei(proposal.minimumSpendUsdStr, stabilityFactorStr)
 
-    const { optionIndex, spendLib } = await this.prompt([
+    const { optionIndex, spendWin } = await this.prompt([
       {
         type: 'list',
         name: 'optionIndex',
@@ -2203,9 +2203,9 @@ vorpal.command('dao vote', 'cast a community vote on a proposal').action(async f
       },
       {
         type: 'number',
-        name: 'spendLib',
-        message: `Amount of LIB to spend on this vote (minimum = ${weiToLibStr(minimumSpendWei)} LIB):`,
-        default: Number(weiToLibStr(minimumSpendWei)),
+        name: 'spendWin',
+        message: `Amount of WIN to spend on this vote (minimum = ${weiToWinStr(minimumSpendWei)} WIN):`,
+        default: Number(weiToWinStr(minimumSpendWei)),
       },
     ])
 
@@ -2219,7 +2219,7 @@ vorpal.command('dao vote', 'cast a community vote on a proposal').action(async f
       from: USER.address,
       proposalId,
       weights,
-      spend: libToWei(spendLib),
+      spend: wintoWei(spendWin),
       timestamp: Date.now(),
     }
     signTransaction(tx)
@@ -2459,7 +2459,7 @@ vorpal.command('dao proposals [status]', `list DAO proposals, optionally filtere
       for (const p of filtered) {
         const title = formatDaoTitle(p.title, 80)
         const options = Array.isArray(p.options) ? p.options.join('/') : ''
-        this.log(`#${p.number} [${p.status}] ${p.proposalType} | ${title} | options: ${options} | pool: ${weiToLibStr(asBigIntForDisplay(p.voterRewardPool))} LIB`)
+        this.log(`#${p.number} [${p.status}] ${p.proposalType} | ${title} | options: ${options} | pool: ${weiToWinStr(asBigIntForDisplay(p.voterRewardPool))} WIN`)
       }
     }
   } catch (err) {
@@ -2499,7 +2499,7 @@ vorpal.command('dao project <number>', 'show a project proposal: milestones, bal
     this.log(`\n--- Project #${body.number} [${body.status}] ---`)
     this.log(`Contractor:   ${p.address}`)
     if (p.proposedAddress) this.log(`Proposed:     ${p.proposedAddress} (${p.endorsedAddress?.length ?? 0} endorsements)`)
-    this.log(`Balance:      ${weiToLibStr(asBigIntForDisplay(p.balance))} LIB  @ rate ${p.rateUsdStr}`)
+    this.log(`Balance:      ${weiToWinStr(asBigIntForDisplay(p.balance))} WIN  @ rate ${p.rateUsdStr}`)
     this.log(`Bonus/penalty thresholds: ${p.durationBonusPercentage}% / ${p.durationPenaltyPercentage}%`)
     if (p.startTime) this.log(`Started:      ${new Date(p.startTime).toISOString()}`)
     if (p.endTime) this.log(`Ended:        ${new Date(p.endTime).toISOString()}`)
@@ -2510,7 +2510,7 @@ vorpal.command('dao project <number>', 'show a project proposal: milestones, bal
       const timing = m.startTime && m.endTime ? ` ${Math.round((m.endTime - m.startTime) / 86400000)}d of ${Math.round(m.duration / 86400000)}d planned` : ''
       const pending = m.proposedTime ? ` | proposed ${new Date(m.proposedTime).toISOString()} (${m.endorsedTime?.length ?? 0} endorsements)` : ''
       const votes = m.terminateVotes?.length ? ` | ${m.terminateVotes.length} terminate vote(s)` : ''
-      this.log(`  ${i + 1}. [${m.status}] ${m.title} | cost ${m.costUsdStr} USD${timing} | paid ${weiToLibStr(paid)} LIB${pending}${votes}`)
+      this.log(`  ${i + 1}. [${m.status}] ${m.title} | cost ${m.costUsdStr} USD${timing} | paid ${weiToWinStr(paid)} WIN${pending}${votes}`)
     })
   } catch (err) {
     this.log('Error:', err.message)
@@ -2641,7 +2641,7 @@ vorpal
           return
         }
         const title = formatDaoTitle(p.title, 60)
-        this.log(`#${e.proposal} [${e.status}]${flag} | active ${active} | ${p.proposalType} | ${title} | pool: ${weiToLibStr(asBigIntForDisplay(p.voterRewardPool))} LIB`)
+        this.log(`#${e.proposal} [${e.status}]${flag} | active ${active} | ${p.proposalType} | ${title} | pool: ${weiToWinStr(asBigIntForDisplay(p.voterRewardPool))} WIN`)
       })
     } catch (err) {
       this.log('Error:', err.message)
@@ -2677,11 +2677,11 @@ vorpal.command('dao proposal <number>', 'show details of a single DAO proposal')
       this.log(`ID:           ${p.id}`)
       this.log(`Status:       ${p.status}`)
       this.log(`Type:         ${p.proposalType}${p.emergency ? ' (EMERGENCY)' : ''}`)
-      // Economics snapshot (USD-string fields converted to LIB at the live rate)
+      // Economics snapshot (USD-string fields converted to WIN at the live rate)
       const stabilityFactorStr = await getStabilityFactorStr()
-      this.log(`Proposal fee: ${p.emergency ? '0 LIB (waived - emergency)' : `${weiToLibStr(usdStrToWei(p.proposalFeeUsdStr, stabilityFactorStr))} LIB (${p.proposalFeeUsdStr} USD)`}`)
-      this.log(`Vote thresh:  ${weiToLibStr(usdStrToWei(p.voteThresholdUsdStr, stabilityFactorStr))} LIB (${p.voteThresholdUsdStr} USD)`)
-      this.log(`Min spend:    ${weiToLibStr(usdStrToWei(p.minimumSpendUsdStr, stabilityFactorStr))} LIB (${p.minimumSpendUsdStr} USD)`)
+      this.log(`Proposal fee: ${p.emergency ? '0 WIN (waived - emergency)' : `${weiToWinStr(usdStrToWei(p.proposalFeeUsdStr, stabilityFactorStr))} WIN (${p.proposalFeeUsdStr} USD)`}`)
+      this.log(`Vote thresh:  ${weiToWinStr(usdStrToWei(p.voteThresholdUsdStr, stabilityFactorStr))} WIN (${p.voteThresholdUsdStr} USD)`)
+      this.log(`Min spend:    ${weiToWinStr(usdStrToWei(p.minimumSpendUsdStr, stabilityFactorStr))} WIN (${p.minimumSpendUsdStr} USD)`)
       this.log(`Pct burned:   ${p.pctBurned}% (after vote result)`)
       // Voting state
       this.log(`Options:      ${p.options.join(', ')}`)
@@ -2697,10 +2697,10 @@ vorpal.command('dao proposal <number>', 'show details of a single DAO proposal')
       const initialBurnedReward = asBigIntForDisplay(p.initialBurnedReward)
       const finalBurnedReward = asBigIntForDisplay(p.finalBurnedReward)
       const claimableTotal = voterRewardPool > 0n ? voterRewardPool : claimedReward + finalBurnedReward
-      this.log(`Reward pool:  ${weiToLibStr(voterRewardPool)} LIB`)
-      this.log(`Burned:       initialBurnedReward: ${weiToLibStr(initialBurnedReward)} LIB | finalBurnedReward: ${weiToLibStr(finalBurnedReward)} LIB`)
+      this.log(`Reward pool:  ${weiToWinStr(voterRewardPool)} WIN`)
+      this.log(`Burned:       initialBurnedReward: ${weiToWinStr(initialBurnedReward)} WIN | finalBurnedReward: ${weiToWinStr(finalBurnedReward)} WIN`)
       if (p.status === 'accepted' || p.status === 'rejected' || p.status === 'applied')
-        this.log(`Claimed:      ${weiToLibStr(claimedReward)} / ${weiToLibStr(claimableTotal)} LIB`)
+        this.log(`Claimed:      ${weiToWinStr(claimedReward)} / ${weiToWinStr(claimableTotal)} WIN`)
       this.log(`Voters:       ${p.voterList.length} | Claims: ${p.claimList.length}`)
       // Committee votes
       const committeeSize = Array.isArray(p.committeeAddresses) ? p.committeeAddresses.length : 0

@@ -6,9 +6,9 @@ import Decimal from 'decimal.js'
 // precision: 40 is a buffer for the unbounded ranges of spend, voteExponent, and minimumSpend;
 // tighten once explicit bounds on those parameters are enforced.
 export const DaoDecimal = Decimal.clone({ precision: 40 })
-export const WEI_PER_LIB = new DaoDecimal('1e18')
+export const WEI_PER_WIN = new DaoDecimal('1e18')
 
-// Scales the Decimal weight into a bigint-safe integer at micro-LIB resolution.
+// Scales the Decimal weight into a bigint-safe integer at micro-WIN resolution.
 export const WEIGHT_PRECISION = new DaoDecimal('1e12')
 
 // Time-decay multiplier for a vote.
@@ -36,32 +36,32 @@ export interface OptionWeightsInput {
 
 export interface VoteWeightDetails {
   totalSelectionWeight: number
-  spendInLIB: Decimal
+  spendInWIN: Decimal
   spendBoost: Decimal
   baseWeight: Decimal
 }
 
 // Vote weight components for a single vote.
 //
-// Policy formula (from Liberdus DAO Voting Policy):
+// Policy formula (from Win DAO Voting Policy):
 //   option[x] = voteSpend
 //               * (voteSpend / minimumSpend) ^ voteExponent
 //               * timeLeftInSecondHalf / totalTimeInSecondHalf
 //               * selectionWeight[x] / totalSelectionWeight
 //
-//   spendInLIB     = spend / 1e18  (converts wei to LIB for human-scale numbers)
+//   spendInWIN     = spend / 1e18  (converts wei to WIN for human-scale numbers)
 //   spendBoost     = (spend / minimumSpend) ^ voteExponent  (exponent-scaled — spend boost grows with voteExponent)
 //   timeMultiplier = getTimeMultiplier()  (decays in the second half; see that function)
-//   baseWeight     = spendInLIB * spendBoost * timeMultiplier * WEIGHT_PRECISION / totalSelectionWeight
+//   baseWeight     = spendInWIN * spendBoost * timeMultiplier * WEIGHT_PRECISION / totalSelectionWeight
 //                    (pre-divided by totalSelectionWeight so each option just multiplies by its weight)
 //
 // Assumes weights has a positive sum and minimumSpendWei > 0 (enforced by dao_vote.validate()).
 export function calculateVoteWeightDetails({ spend, minimumSpendWei, voteExponent, weights, timeMultiplier }: OptionWeightsInput): VoteWeightDetails {
   const totalSelectionWeight = weights.reduce((sum, w) => sum + w, 0)
-  const spendInLIB = new DaoDecimal(spend.toString()).dividedBy(WEI_PER_LIB)
+  const spendInWIN = new DaoDecimal(spend.toString()).dividedBy(WEI_PER_WIN)
   const spendBoost = new DaoDecimal(spend.toString()).dividedBy(minimumSpendWei.toString()).pow(voteExponent)
-  const baseWeight = spendInLIB.times(spendBoost).times(timeMultiplier).times(WEIGHT_PRECISION).dividedBy(totalSelectionWeight)
-  return { totalSelectionWeight, spendInLIB, spendBoost, baseWeight }
+  const baseWeight = spendInWIN.times(spendBoost).times(timeMultiplier).times(WEIGHT_PRECISION).dividedBy(totalSelectionWeight)
+  return { totalSelectionWeight, spendInWIN, spendBoost, baseWeight }
 }
 
 // Spreads the base vote weight across all options according to the voter's split.

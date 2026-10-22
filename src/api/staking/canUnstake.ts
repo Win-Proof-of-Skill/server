@@ -1,5 +1,5 @@
 import { NodeAccount, UserAccount } from '../../@types'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { isStakeUnlocked } from '../../transactions/staking/withdraw_stake'
 import { nestedCountersInstance, Shardus } from '@shardus/core'
 
@@ -20,7 +20,7 @@ export const canUnstake =
 
       res.json({ stakeUnlocked })
     } catch (e) {
-      if (LiberdusFlags.VerboseLogs) console.log(`Error /canUnstake`, e)
+      if (WinFlags.VerboseLogs) console.log(`Error /canUnstake`, e)
       nestedCountersInstance.countEvent('canUnstake-api-error', e.message)
       res.status(500).send(e.message)
     }

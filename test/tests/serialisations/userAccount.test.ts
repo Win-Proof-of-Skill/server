@@ -2,18 +2,18 @@ import { VectorBufferStream } from '@shardus/core'
 import { Utils } from '@shardus/lib-types'
 import { deserializeAccounts, SerdeTypeIdent, serializeAccounts } from '../../../src/accounts'
 import { TollUnit, UserAccount } from '../../../src/@types'
-import { LiberdusFlags } from '../../../src/config'
+import { WinFlags } from '../../../src/config'
 import { deserializeUserAccount, serializeUserAccount } from '../../../src/accounts/userAccount'
 import { deserializeAppData, serializeAppData } from '../../../src/accounts/appDataSerialization'
 
 // Captured from the pre-removal serializer for a default UserAccount.
 const defaultAccountHex =
-  '090004000000746573740b000000557365724163636f756e743200000000000000010100000000000000030000004c49420000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000'
+  '090004000000746573740b000000557365724163636f756e7432000000000000000101000000000000000300000057494e0000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000'
 
 const strippedAccount = (): UserAccount => ({
   id: 'test',
   type: 'UserAccount',
-  data: { balance: 50n, toll: 1n, tollUnit: TollUnit.lib, chats: {}, chatTimestamp: 0 },
+  data: { balance: 50n, toll: 1n, tollUnit: TollUnit.win, chats: {}, chatTimestamp: 0 },
   alias: null,
   hash: '',
   lastMaintenance: 0,
@@ -38,12 +38,12 @@ const encodeDirect = (account: UserAccount): Buffer => {
 }
 
 describe('UserAccount serialization dispatch', () => {
-  const originalDaoFlag = LiberdusFlags.versionFlags.removeLegacyDaoState
-  const originalUnusedFlag = LiberdusFlags.versionFlags.removeUnusedTxState
+  const originalDaoFlag = WinFlags.versionFlags.removeLegacyDaoState
+  const originalUnusedFlag = WinFlags.versionFlags.removeUnusedTxState
 
   afterEach(() => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = originalDaoFlag
-    LiberdusFlags.versionFlags.removeUnusedTxState = originalUnusedFlag
+    WinFlags.versionFlags.removeLegacyDaoState = originalDaoFlag
+    WinFlags.versionFlags.removeUnusedTxState = originalUnusedFlag
   })
 
   test('production PascalCase accounts use JSON and preserve both account shapes', () => {
@@ -64,8 +64,8 @@ describe('UserAccount serialization dispatch', () => {
 
   test('default binary slots match the pre-removal bytes with either flag setting', () => {
     for (const active of [false, true]) {
-      LiberdusFlags.versionFlags.removeUnusedTxState = active
-      LiberdusFlags.versionFlags.removeLegacyDaoState = active
+      WinFlags.versionFlags.removeUnusedTxState = active
+      WinFlags.versionFlags.removeLegacyDaoState = active
       const input = active ? strippedAccount() : defaultLegacyAccount()
       const encoded = encodeDirect(input)
       expect(encoded.toString('hex')).toBe(defaultAccountHex)
@@ -75,8 +75,8 @@ describe('UserAccount serialization dispatch', () => {
   })
 
   test('decoding a stripped binary account before activation reconstructs defaults', () => {
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
-    LiberdusFlags.versionFlags.removeLegacyDaoState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeLegacyDaoState = false
     const decoded = deserializeUserAccount(VectorBufferStream.fromBuffer(encodeDirect(strippedAccount())), true)
     expect(decoded).toEqual(defaultLegacyAccount())
   })

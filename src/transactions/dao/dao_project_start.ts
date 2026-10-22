@@ -136,7 +136,7 @@ export const apply = (
   // wrappedStates, which Shardus snapshots identically for every node.
   const mintWei = projectMintAmountWei(project.milestones, (usdStr) => utils.usdStrToWei(usdStr, network))
   project.balance = mintWei
-  // Every later payout converts at this rate, not the live one, so the contractor carries the LIB
+  // Every later payout converts at this rate, not the live one, so the contractor carries the WIN
   // price risk from here and the DAO's exposure is fixed at the amount minted.
   project.rateUsdStr = network.current.stabilityFactorStr
   project.startTime = txTimestamp

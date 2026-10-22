@@ -77,7 +77,7 @@ describe('milestonePayoutWei', () => {
 describe('usdToWeiAtRate', () => {
   test('converts at the supplied rate, not a live one', () => {
     expect(usdToWeiAtRate('100', '1')).toBe(ethers.parseEther('100'))
-    // A LIB worth $0.50 means twice as much LIB for the same USD.
+    // A WIN worth $0.50 means twice as much WIN for the same USD.
     expect(usdToWeiAtRate('100', '0.5')).toBe(ethers.parseEther('200'))
   })
 

@@ -6,7 +6,7 @@ import debug from './debug'
 import staking from './staking'
 import node from './node'
 import { handlePutAdminCertificate } from './admin_certificate'
-import { debug_liberdus_flags, set_liberdus_flag } from './liberdus_flags'
+import { debug_win_flags, set_win_flag } from './win_flags'
 import dao from './dao'
 import { Shardus } from '@shardus/core'
 export default (dapp: Shardus): void => {
@@ -53,7 +53,7 @@ export default (dapp: Shardus): void => {
   dapp.registerExternalPut('query-certificate', staking.queryCertificate(dapp))
   dapp.registerExternalPut('admin-certificate', handlePutAdminCertificate(dapp))
 
-  // Liberdus Flags
-  dapp.registerExternalGet('debug-liberdus-flags', debug_liberdus_flags(dapp))
-  dapp.registerExternalGet('debug-set-liberdus-flag', set_liberdus_flag(dapp))
+  // Win Flags
+  dapp.registerExternalGet('debug-win-flags', debug_win_flags(dapp))
+  dapp.registerExternalGet('debug-set-win-flag', set_win_flag(dapp))
 }

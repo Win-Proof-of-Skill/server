@@ -5,7 +5,7 @@ import {
   calculateOptionWeights,
 } from '../../src/utils/dao/daoVoteMath'
 
-const LIB = 10n ** 18n // 1 LIB in wei
+const WIN = 10n ** 18n // 1 WIN in wei
 const HOUR_MS = 3_600_000
 const DAY_MS = 24 * HOUR_MS
 
@@ -51,7 +51,7 @@ describe('getTimeMultiplier', () => {
 // ─── calculateVoteWeightDetails ───────────────────────────────────────────────
 
 describe('calculateVoteWeightDetails', () => {
-  const minimumSpendWei = 1n * LIB      // 1 LIB minimum
+  const minimumSpendWei = 1n * WIN      // 1 WIN minimum
   const voteExponent = 0.1
   const timeMultiplier = new DaoDecimal(1) // full weight (first half)
 
@@ -68,7 +68,7 @@ describe('calculateVoteWeightDetails', () => {
 
   test('spend 10x minimum gives spendBoost of 10^0.1', () => {
     const { spendBoost } = calculateVoteWeightDetails({
-      spend: 10n * LIB,
+      spend: 10n * WIN,
       minimumSpendWei,
       voteExponent,
       weights: [1],
@@ -77,26 +77,26 @@ describe('calculateVoteWeightDetails', () => {
     expect(spendBoost.toNumber()).toBeCloseTo(Math.pow(10, 0.1))
   })
 
-  test('spendInLIB converts wei to LIB correctly', () => {
-    const { spendInLIB } = calculateVoteWeightDetails({
-      spend: 5n * LIB,
+  test('spendInWIN converts wei to WIN correctly', () => {
+    const { spendInWIN } = calculateVoteWeightDetails({
+      spend: 5n * WIN,
       minimumSpendWei,
       voteExponent,
       weights: [1],
       timeMultiplier,
     })
-    expect(spendInLIB.toNumber()).toBeCloseTo(5)
+    expect(spendInWIN.toNumber()).toBeCloseTo(5)
   })
 
   test('timeMultiplier = 0.5 halves the baseWeight compared to full weight', () => {
-    const input = { spend: 5n * LIB, minimumSpendWei, voteExponent, weights: [1] }
+    const input = { spend: 5n * WIN, minimumSpendWei, voteExponent, weights: [1] }
     const { baseWeight: full } = calculateVoteWeightDetails({ ...input, timeMultiplier: new DaoDecimal(1) })
     const { baseWeight: half } = calculateVoteWeightDetails({ ...input, timeMultiplier: new DaoDecimal(0.5) })
     expect(half.toNumber()).toBeCloseTo(full.toNumber() / 2)
   })
 
   test('splitting weights [1,1] halves baseWeight vs [1] for the same spend', () => {
-    const input = { spend: 5n * LIB, minimumSpendWei, voteExponent, timeMultiplier }
+    const input = { spend: 5n * WIN, minimumSpendWei, voteExponent, timeMultiplier }
     const { baseWeight: single } = calculateVoteWeightDetails({ ...input, weights: [1] })
     const { baseWeight: split }  = calculateVoteWeightDetails({ ...input, weights: [1, 1] })
     // baseWeight is pre-divided by totalSelectionWeight: [1,1] sum=2 → half of [1] sum=1
@@ -107,10 +107,10 @@ describe('calculateVoteWeightDetails', () => {
 // ─── calculateOptionWeights ───────────────────────────────────────────────────
 
 describe('calculateOptionWeights', () => {
-  const minimumSpendWei = 1n * LIB
+  const minimumSpendWei = 1n * WIN
   const voteExponent = 0.1
   const timeMultiplier = new DaoDecimal(1)
-  const spend = 1n * LIB // exactly minimum → spendBoost = 1
+  const spend = 1n * WIN // exactly minimum → spendBoost = 1
 
   test('single option receives the full weight', () => {
     const [w] = calculateOptionWeights({ spend, minimumSpendWei, voteExponent, weights: [1], timeMultiplier })
@@ -156,11 +156,11 @@ describe('calculateOptionWeights', () => {
   })
 
   test('higher spend produces proportionally higher weights', () => {
-    const base   = calculateOptionWeights({ spend: 1n * LIB,  minimumSpendWei, voteExponent, weights: [1], timeMultiplier })
-    const double = calculateOptionWeights({ spend: 2n * LIB,  minimumSpendWei, voteExponent, weights: [1], timeMultiplier })
-    // baseWeight = spendInLIB * spendBoost ∝ spend^(1 + voteExponent); doubling spend always
+    const base   = calculateOptionWeights({ spend: 1n * WIN,  minimumSpendWei, voteExponent, weights: [1], timeMultiplier })
+    const double = calculateOptionWeights({ spend: 2n * WIN,  minimumSpendWei, voteExponent, weights: [1], timeMultiplier })
+    // baseWeight = spendInWIN * spendBoost ∝ spend^(1 + voteExponent); doubling spend always
     // more than doubles the weight as long as voteExponent > 0 (here (2/1)^0.1 ≈ 1.07, on top
-    // of spendInLIB itself doubling)
+    // of spendInWIN itself doubling)
     expect(double[0]).toBeGreaterThan(base[0] * 2n)
   })
 })

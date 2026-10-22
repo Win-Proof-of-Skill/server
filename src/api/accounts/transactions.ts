@@ -1,4 +1,4 @@
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 
 export const transactions =
   (dapp) =>
@@ -10,17 +10,17 @@ export const transactions =
 
       try {
         const cachedAppData = await dapp.getLocalOrRemoteCachedAppData('receipt', txId)
-        if (LiberdusFlags.VerboseLogs) console.log(`cachedAppData for tx hash ${txId}`, cachedAppData)
+        if (WinFlags.VerboseLogs) console.log(`cachedAppData for tx hash ${txId}`, cachedAppData)
         if (cachedAppData && cachedAppData.appData) {
-          /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`cachedAppData: Found tx receipt for ${txId} ${Date.now()}`)
+          /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`cachedAppData: Found tx receipt for ${txId} ${Date.now()}`)
           const receipt = cachedAppData.appData
           return res.json({ transaction: receipt })
         } else {
-          /* prettier-ignore */ if (LiberdusFlags) console.log(`cachedAppData: Unable to find tx receipt for ${txId} ${Date.now()}`)
+          /* prettier-ignore */ if (WinFlags) console.log(`cachedAppData: Unable to find tx receipt for ${txId} ${Date.now()}`)
         }
         return res.json({ transaction: null })
       } catch (error) {
-        /* prettier-ignore */ if (LiberdusFlags) console.log('cachedAppData: Unable to get tx receipt: ', error.message)
+        /* prettier-ignore */ if (WinFlags) console.log('cachedAppData: Unable to get tx receipt: ', error.message)
         return res.json({ transaction: null })
       }
     } catch (error) {

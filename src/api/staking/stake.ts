@@ -1,4 +1,4 @@
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import * as AccountsStorage from '../../storage/accountStorage'
 import { getStakeRequiredWei } from '../../utils'
 import { nestedCountersInstance } from '@shardus/core'
@@ -21,7 +21,7 @@ export const stake =
       }
       res.json(response)
     } catch (e) {
-      if (LiberdusFlags.VerboseLogs) console.log(`Error /stake`, e)
+      if (WinFlags.VerboseLogs) console.log(`Error /stake`, e)
       nestedCountersInstance.countEvent('stake-api-error', e.message)
       res.status(500).send(e.message)
     }

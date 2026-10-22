@@ -1,11 +1,11 @@
 // test-signatures.ts
 import { ethers } from 'ethers';
 import { signObj, verifyObj } from '../src/crypto';
-import { LiberdusFlags } from '../src/config';
+import { WinFlags } from '../src/config';
 
-// Mock LiberdusFlags if not available in test environment
-if (typeof LiberdusFlags === 'undefined') {
-  (global as any).LiberdusFlags = {
+// Mock WinFlags if not available in test environment
+if (typeof WinFlags === 'undefined') {
+  (global as any).WinFlags = {
     useEthereumAddress: true,
     VerboseLogs: true
   };

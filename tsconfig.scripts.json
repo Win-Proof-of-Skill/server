@@ -3,7 +3,7 @@
   "compilerOptions": {
     "target": "ES2021",
     "allowJs": true,
-    "skipLibCheck": true,
+    "skipWinCheck": true,
     "strict": false,
     "noEmitOnError": false,
     "esModuleInterop": true,

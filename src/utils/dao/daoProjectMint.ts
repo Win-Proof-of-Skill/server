@@ -1,5 +1,5 @@
 import { ethers } from 'ethers'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { DaoMilestone } from '../../@types'
 
 /**
@@ -13,15 +13,15 @@ import { DaoMilestone } from '../../@types'
  * in validation — so a bad value stops mints rather than widening them.
  */
 export function maxMintThresholdWei(): bigint {
-  const configured = LiberdusFlags.daoMaxMintThresholdLibStr
+  const configured = WinFlags.daoMaxMintThresholdWinStr
   let parsed: bigint
   try {
     parsed = ethers.parseEther(configured)
   } catch {
-    throw new Error(`daoMaxMintThresholdLibStr ("${configured}") is not a valid decimal LIB string`)
+    throw new Error(`daoMaxMintThresholdWinStr ("${configured}") is not a valid decimal WIN string`)
   }
   if (parsed < 0n) {
-    throw new Error(`daoMaxMintThresholdLibStr ("${configured}") must not be negative`)
+    throw new Error(`daoMaxMintThresholdWinStr ("${configured}") must not be negative`)
   }
   return parsed
 }

@@ -4,7 +4,7 @@ import * as crypto from '@shardus/lib-crypto-utils'
 import { SerdeTypeIdent } from '.'
 import * as utils from '../utils'
 import * as AccountsStorage from '../storage/accountStorage'
-import { INITIAL_PARAMETERS, LiberdusFlags } from '../config'
+import { INITIAL_PARAMETERS, WinFlags } from '../config'
 
 const populatedRetiredFieldsError = 'UserAccount binary codec does not support populated retired fields'
 
@@ -32,16 +32,16 @@ export const userAccount = (accountId: string, timestamp: number): UserAccount =
     id: accountId,
     type: 'UserAccount',
     data: {
-      balance: utils.libToWei(50),
+      balance: utils.wintoWei(50),
       toll: utils.getDefaultTollWei(AccountsStorage.cachedNetworkAccount ?? ({ current: INITIAL_PARAMETERS } as NetworkAccount)),
-      tollUnit: TollUnit.lib,
+      tollUnit: TollUnit.win,
       chats: {},
       chatTimestamp: 0,
-      ...(LiberdusFlags.versionFlags.removeLegacyDaoState ? {} : { payments: [] }),
-      ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { stake: BigInt(0), remove_stake_request: null, friends: {} }),
+      ...(WinFlags.versionFlags.removeLegacyDaoState ? {} : { payments: [] }),
+      ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { stake: BigInt(0), remove_stake_request: null, friends: {} }),
     },
     alias: null,
-    ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { emailHash: null, verified: false, claimedSnapshot: false }),
+    ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { emailHash: null, verified: false, claimedSnapshot: false }),
     hash: '',
     lastMaintenance: timestamp,
     timestamp: 0,
@@ -211,11 +211,11 @@ export const deserializeUserAccount = (stream: VectorBufferStream, root = false)
       tollUnit,
       chats,
       chatTimestamp,
-      ...(LiberdusFlags.versionFlags.removeLegacyDaoState ? {} : { payments: [] }),
-      ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { stake: BigInt(0), remove_stake_request: null, friends: {} }),
+      ...(WinFlags.versionFlags.removeLegacyDaoState ? {} : { payments: [] }),
+      ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { stake: BigInt(0), remove_stake_request: null, friends: {} }),
     },
     alias,
-    ...(LiberdusFlags.versionFlags.removeUnusedTxState ? {} : { emailHash: null, verified: false, claimedSnapshot: false }),
+    ...(WinFlags.versionFlags.removeUnusedTxState ? {} : { emailHash: null, verified: false, claimedSnapshot: false }),
     hash,
     lastMaintenance,
     timestamp,

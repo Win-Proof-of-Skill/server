@@ -1,4 +1,4 @@
-import { LiberdusFlags } from '../src/config'
+import { WinFlags } from '../src/config'
 import { Accounts, NetworkAccount, NodeAccount, UserAccount } from '../src/@types'
 import * as crypto from '../src/crypto'
 import { calculateAccountHash, stripRetiredState } from '../src/utils'
@@ -9,14 +9,14 @@ import { nodeAccount } from '../src/accounts/nodeAccount'
 import { Utils } from '@shardus/lib-types'
 
 describe('legacy DAO state migration', () => {
-  const originalFlag = LiberdusFlags.versionFlags.removeLegacyDaoState
-  const originalUnusedTxFlag = LiberdusFlags.versionFlags.removeUnusedTxState
-  const originalNetworkParamsFlag = LiberdusFlags.versionFlags.removeLegacyNetworkParams
+  const originalFlag = WinFlags.versionFlags.removeLegacyDaoState
+  const originalUnusedTxFlag = WinFlags.versionFlags.removeUnusedTxState
+  const originalNetworkParamsFlag = WinFlags.versionFlags.removeLegacyNetworkParams
 
   afterEach(() => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = originalFlag
-    LiberdusFlags.versionFlags.removeUnusedTxState = originalUnusedTxFlag
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = originalNetworkParamsFlag
+    WinFlags.versionFlags.removeLegacyDaoState = originalFlag
+    WinFlags.versionFlags.removeUnusedTxState = originalUnusedTxFlag
+    WinFlags.versionFlags.removeLegacyNetworkParams = originalNetworkParamsFlag
   })
 
   beforeAll(() => {
@@ -27,25 +27,25 @@ describe('legacy DAO state migration', () => {
   test('the 2.5.2 migration is registered and activates the flag', async () => {
     // Snapshot every versionFlag: onActiveVersionChange replays all migrations up to the
     // given version, not just 2.5.2.
-    const snapshot = { ...LiberdusFlags.versionFlags }
-    LiberdusFlags.versionFlags.removeLegacyDaoState = false
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = false
+    const snapshot = { ...WinFlags.versionFlags }
+    WinFlags.versionFlags.removeLegacyDaoState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeLegacyNetworkParams = false
 
     try {
       await onActiveVersionChange('2.5.2')
-      expect(LiberdusFlags.versionFlags.removeLegacyDaoState).toBe(true)
-      expect(LiberdusFlags.versionFlags.removeUnusedTxState).toBe(true)
-      expect(LiberdusFlags.versionFlags.removeLegacyNetworkParams).toBe(true)
+      expect(WinFlags.versionFlags.removeLegacyDaoState).toBe(true)
+      expect(WinFlags.versionFlags.removeUnusedTxState).toBe(true)
+      expect(WinFlags.versionFlags.removeLegacyNetworkParams).toBe(true)
     } finally {
       // Restore even on failure: onActiveVersionChange flips flags for every migration
       // up to 2.5.2, and leaking those would corrupt later tests.
-      Object.assign(LiberdusFlags.versionFlags, snapshot)
+      Object.assign(WinFlags.versionFlags, snapshot)
     }
   })
 
   test('removes retired fields when the migration is active', () => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = true
+    WinFlags.versionFlags.removeLegacyDaoState = true
     const network = {
       type: 'NetworkAccount',
       current: { proposalFee: 1n, devProposalFee: 2n },
@@ -71,7 +71,7 @@ describe('legacy DAO state migration', () => {
   })
 
   test('does not strip retired state while calculating an account hash', () => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = true
+    WinFlags.versionFlags.removeLegacyDaoState = true
     const account = {
       id: 'user',
       type: 'UserAccount',
@@ -88,7 +88,7 @@ describe('legacy DAO state migration', () => {
   })
 
   test('strips retired user-account state only from the apply-state helper', () => {
-    LiberdusFlags.versionFlags.removeLegacyDaoState = true
+    WinFlags.versionFlags.removeLegacyDaoState = true
     const account = {
       type: 'UserAccount',
       data: { payments: [{ amount: 1n }] },
@@ -109,12 +109,12 @@ describe('legacy DAO state migration', () => {
       verified: false,
       claimedSnapshot: false,
     } as unknown as UserAccount
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
     stripRetiredState(account)
     expect(account.data).toHaveProperty('friends')
     expect(account).toHaveProperty('verified')
 
-    LiberdusFlags.versionFlags.removeUnusedTxState = true
+    WinFlags.versionFlags.removeUnusedTxState = true
     calculateAccountHash(account as Accounts)
     expect(account.data).toHaveProperty('friends')
     stripRetiredState(account)
@@ -144,11 +144,11 @@ describe('legacy DAO state migration', () => {
     } as unknown as NetworkAccount
     const legacyKeys = ['transactionFee', 'faucetAmount', 'nodeRewardAmountUsd', 'nodePenaltyUsd', 'stakeRequiredUsd', 'defaultToll', 'minToll']
 
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = false
+    WinFlags.versionFlags.removeLegacyNetworkParams = false
     backfillNetworkAccount(network)
     for (const key of legacyKeys) expect(network.current).toHaveProperty(key)
 
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = true
+    WinFlags.versionFlags.removeLegacyNetworkParams = true
     backfillNetworkAccount(network)
     for (const key of legacyKeys) expect(network.current).not.toHaveProperty(key)
     expect(network.current.maintenanceInterval).toBe(86_400_000)
@@ -157,13 +157,13 @@ describe('legacy DAO state migration', () => {
   })
 
   test('new users omit retired fields only after activation', () => {
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
     const before = userAccount('user', 1)
     expect(before.data).toHaveProperty('stake', 0n)
     expect(before.data).toHaveProperty('friends')
     expect(before).toHaveProperty('verified', false)
 
-    LiberdusFlags.versionFlags.removeUnusedTxState = true
+    WinFlags.versionFlags.removeUnusedTxState = true
     const after = userAccount('user', 1)
     expect(after.data).not.toHaveProperty('stake')
     expect(after.data).not.toHaveProperty('friends')
@@ -173,12 +173,12 @@ describe('legacy DAO state migration', () => {
   test('node-account balance and nodeRewardTime remain until activation, then leave on the apply-state path', () => {
     const account = { id: 'node', type: 'NodeAccount', hash: '', balance: 0n, nodeRewardTime: 0, stakeLock: 10n } as unknown as NodeAccount
 
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
     stripRetiredState(account)
     expect(account).toHaveProperty('balance', 0n)
     expect(account).toHaveProperty('nodeRewardTime', 0)
 
-    LiberdusFlags.versionFlags.removeUnusedTxState = true
+    WinFlags.versionFlags.removeUnusedTxState = true
     calculateAccountHash(account as unknown as Accounts)
     expect(account).toHaveProperty('balance')
     stripRetiredState(account)
@@ -188,12 +188,12 @@ describe('legacy DAO state migration', () => {
   })
 
   test('new node accounts omit balance and nodeRewardTime only after activation', () => {
-    LiberdusFlags.versionFlags.removeUnusedTxState = false
+    WinFlags.versionFlags.removeUnusedTxState = false
     const before = nodeAccount('node')
     expect(before).toHaveProperty('balance', 0n)
     expect(before).toHaveProperty('nodeRewardTime', 0)
 
-    LiberdusFlags.versionFlags.removeUnusedTxState = true
+    WinFlags.versionFlags.removeUnusedTxState = true
     const after = nodeAccount('node')
     expect(after).not.toHaveProperty('balance')
     expect(after).not.toHaveProperty('nodeRewardTime')

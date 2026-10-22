@@ -68,7 +68,7 @@ export const validate = (
     return response
   }
   // The contractor gets a long window to claim what they earned before the DAO takes it back.
-  const reclaimableAt = (project.endTime ?? 0) + config.LiberdusFlags.daoProjectReclaimDelayMs
+  const reclaimableAt = (project.endTime ?? 0) + config.WinFlags.daoProjectReclaimDelayMs
   if (tx.timestamp < reclaimableAt) {
     response.reason = `Project balance cannot be reclaimed until ${reclaimableAt}`
     return response
@@ -101,7 +101,7 @@ export const apply = (
   from.data.balance = SafeBigIntMath.subtract(from.data.balance, txFeeWei)
 
   // The balance is not transferred anywhere — it was minted into the project and is simply gone
-  // again. Since a project's balance counts toward the LIB in circulation, leaving it unclaimed
+  // again. Since a project's balance counts toward the WIN in circulation, leaving it unclaimed
   // forever would inflate the supply for work that was never paid for.
   const reclaimedAmount = project.balance
   project.balance = 0n

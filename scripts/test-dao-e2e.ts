@@ -169,8 +169,8 @@ const PARALLEL = cliArgs.includes('--parallel')
 
 const ARCHIVER_HOST = 'localhost:4000'
 
-/** Every test account is funded with this much LIB — well above any fee/threshold at any stability factor. */
-const TEST_ACCOUNT_FUND_LIB = 100_000
+/** Every test account is funded with this much WIN — well above any fee/threshold at any stability factor. */
+const TEST_ACCOUNT_FUND_WIN = 100_000
 
 // ─── Log file setup ───────────────────────────────────────────────────────────
 // App log: test-logs/dao-e2e-<timestamp>.log
@@ -416,7 +416,7 @@ interface NetworkTiming {
   votingDurationMs: number
   graceDurationMs: number
   claimDurationMs: number
-  /** For computing minimum dao_vote spend (USD → LIB via stabilityFactor). */
+  /** For computing minimum dao_vote spend (USD → WIN via stabilityFactor). */
   stabilityFactorStr: string
   minimumSpendUsdStr: string
 }
@@ -825,17 +825,17 @@ async function sleepUntilTimestamp(targetMs: number, label: string, bufferMs = 5
   }
 }
 
-/** Convert whole-LIB amount to wei (bigint). */
-function libToWei(lib: number): bigint {
-  return BigInt(lib) * 10n ** 18n
+/** Convert whole-WIN amount to wei (bigint). */
+function wintoWei(win: number): bigint {
+  return BigInt(win) * 10n ** 18n
 }
 
-/** Convert a USD string to whole LIB (ceil), matching server USD-to-LIB conversion. */
-function usdStrToLibCeil(usdStr: string, stabilityFactorStr: string): number {
+/** Convert a USD string to whole WIN (ceil), matching server USD-to-WIN conversion. */
+function usdStrToWinCeil(usdStr: string, stabilityFactorStr: string): number {
   const stabilityWei = ethers.parseEther(stabilityFactorStr)
   const usdWei = ethers.parseEther(usdStr)
-  const libWei = (usdWei * 10n ** 18n) / stabilityWei
-  return Math.ceil(Number(ethers.formatEther(libWei)))
+  const winWei = (usdWei * 10n ** 18n) / stabilityWei
+  return Math.ceil(Number(ethers.formatEther(winWei)))
 }
 
 /**
@@ -845,12 +845,12 @@ function usdStrToLibCeil(usdStr: string, stabilityFactorStr: string): number {
  * wei. Every project amount is a sum of per-milestone cost and bonus figures, so the expectation
  * has to be built the same way to match exactly.
  */
-function usdSumToLibWei(rateUsdStr: string, ...usdStrs: string[]): bigint {
-  return usdStrs.reduce((total, usdStr) => total + usdStrToLibWei(usdStr, rateUsdStr), 0n)
+function usdSumToWinWei(rateUsdStr: string, ...usdStrs: string[]): bigint {
+  return usdStrs.reduce((total, usdStr) => total + usdStrToWinWei(usdStr, rateUsdStr), 0n)
 }
 
-/** Convert a USD string to LIB wei using the network stability factor. */
-function usdStrToLibWei(usdStr: string, stabilityFactorStr: string): bigint {
+/** Convert a USD string to WIN wei using the network stability factor. */
+function usdStrToWinWei(usdStr: string, stabilityFactorStr: string): bigint {
   return ethers.parseEther(usdStr) * 10n ** 18n / ethers.parseEther(stabilityFactorStr)
 }
 
@@ -1452,20 +1452,20 @@ async function getDaoParameters(): Promise<any> {
 
 /**
  * Queries and clamps the live threshold exactly like dao_unapply_parameters.apply() does, so
- * a --no-start rerun stays correct even if /debug-set-liberdus-flag changed it since.
+ * a --no-start rerun stays correct even if /debug-set-win-flag changed it since.
  */
 async function getEffectiveUnapplyThreshold(committeeSize: number): Promise<number> {
-  const res = await apiGet('/debug-liberdus-flags')
-  const configured = safeParse(res.data)?.LiberdusFlags?.daoUnapplyCommitteeThreshold
+  const res = await apiGet('/debug-win-flags')
+  const configured = safeParse(res.data)?.WinFlags?.daoUnapplyCommitteeThreshold
   const base = Number.isSafeInteger(configured) && configured > 0 ? configured : 3
   return Math.min(base, committeeSize)
 }
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
-/** Read from the live flags so a /debug-set-liberdus-flag change cannot invalidate the assertions. */
+/** Read from the live flags so a /debug-set-win-flag change cannot invalidate the assertions. */
 async function getDaoProposalTimingLimits(): Promise<{ maxStartDelayMs: number; maxGracePeriodMs: number }> {
-  const flags = safeParse((await apiGet('/debug-liberdus-flags')).data)?.LiberdusFlags
+  const flags = safeParse((await apiGet('/debug-win-flags')).data)?.WinFlags
   const startDelay = flags?.daoMaxProposalStartDelayMs
   const gracePeriod = flags?.daoMaxProposalGracePeriodMs
   return {
@@ -1662,7 +1662,7 @@ async function castVote(
   proposalNumber: number,
   voter: TestAccount,
   weights: number[],
-  spendLib: number,
+  spendWin: number,
   expectedBalanceDelta?: (receipt: TxReceipt) => bigint,
 ): Promise<any> {
   return injectAndAssert(
@@ -1672,7 +1672,7 @@ async function castVote(
       from: voter.address,
       proposalId: daoProposalId(proposalNumber),
       weights,
-      spend: libToWei(spendLib),
+      spend: wintoWei(spendWin),
     },
     voter,
     { expectedBalanceDelta },
@@ -1943,17 +1943,17 @@ async function expectPreCrackRejectNoGlobalChange(
 }
 
 /** Inject a 'create' TX to fund an account and wait for apply receipt. */
-async function fundAccount(account: TestAccount, amountLib: number): Promise<void> {
+async function fundAccount(account: TestAccount, amountWin: number): Promise<void> {
   return withSenderLock(account.address, async () => {
     const tx: any = {
       type: 'create',
       networkId: currentNetworkId,
       from: account.address,
-      amount: libToWei(amountLib),
+      amount: wintoWei(amountWin),
       timestamp: Date.now(),
     }
     await signTx(tx, account)
-    verboseStepLog(`→ Fund TX (${amountLib} LIB):`, Utils.safeStringify(tx))
+    verboseStepLog(`→ Fund TX (${amountWin} WIN):`, Utils.safeStringify(tx))
     let res: any
     try {
       res = await apiPost('/inject', { tx: Utils.safeStringify(tx) })
@@ -2353,8 +2353,8 @@ async function main(): Promise<void> {
   // get misreported as a failure.
   txSettleTimeoutMs = cycleDurationMs * (PARALLEL ? 8 : 2) + SLEEP_BUFFER_MS
 
-  const minVoteSpendLib = usdStrToLibCeil(minimumSpendUsdStr, stabilityFactorStr)
-  console.log(`Funding: ${TEST_ACCOUNT_FUND_LIB} LIB per account; min dao_vote spend≈${minVoteSpendLib} LIB`)
+  const minVoteSpendWin = usdStrToWinCeil(minimumSpendUsdStr, stabilityFactorStr)
+  console.log(`Funding: ${TEST_ACCOUNT_FUND_WIN} WIN per account; min dao_vote spend≈${minVoteSpendWin} WIN`)
 
   let sc1VoteExponentTarget = 0.2
   let sc4PctBurnedTarget = 70
@@ -2370,9 +2370,9 @@ async function main(): Promise<void> {
   if (shouldFundAccounts) {
     await step('0.1  Fund all DAO E2E accounts', async () => {
       await Promise.all([
-        ...proposers.map(a => fundAccount(a, TEST_ACCOUNT_FUND_LIB)),
-        ...voters.map(a => fundAccount(a, TEST_ACCOUNT_FUND_LIB)),
-        ...committee.map(c => fundAccount(c, TEST_ACCOUNT_FUND_LIB)),
+        ...proposers.map(a => fundAccount(a, TEST_ACCOUNT_FUND_WIN)),
+        ...voters.map(a => fundAccount(a, TEST_ACCOUNT_FUND_WIN)),
+        ...committee.map(c => fundAccount(c, TEST_ACCOUNT_FUND_WIN)),
       ])
     })
   }
@@ -2390,7 +2390,7 @@ async function main(): Promise<void> {
         const daoParams = await getDaoParameters()
         const currentVoteExponent = Number(daoParams.voteExponent)
         sc1VoteExponentTarget = currentVoteExponent === 0.2 ? 0.1 : 0.2
-        const proposalFeeWei = usdStrToLibWei(daoParams.proposalFeeUsdStr, stabilityFactorStr)
+        const proposalFeeWei = usdStrToWinWei(daoParams.proposalFeeUsdStr, stabilityFactorStr)
         setProposalN('sc1', await createDaoProposal({
           proposer,
           title: 'Vote exponent adjustment',
@@ -2504,8 +2504,8 @@ async function main(): Promise<void> {
       async () => {
         // weights[i] maps 1:1 by index onto proposal.options[i] — [0, 1] puts the vote's
         // entire weight on options[1], the action option for negative-first DAO ballots.
-        await castVote(proposalN.sc1, voter1, [0, 1], minVoteSpendLib, receipt => -(libToWei(minVoteSpendLib) + asBigInt(receipt.transactionFee ?? 0n)))
-        await castVote(proposalN.sc1, voter2, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc1, voter1, [0, 1], minVoteSpendWin, receipt => -(wintoWei(minVoteSpendWin) + asBigInt(receipt.transactionFee ?? 0n)))
+        await castVote(proposalN.sc1, voter2, [0, 1], minVoteSpendWin)
         const proposal = await getProposal(proposalN.sc1)
         assert(asBigInt(proposal.totalVote[1]) > 0n, 'Expected totalVote[1] > 0 after votes')
         assert(asBigInt(proposal.voterRewardPool) > 0n, 'Expected voterRewardPool > 0 after vote spend')
@@ -2573,7 +2573,7 @@ async function main(): Promise<void> {
         const proposal = await getProposal(proposalN.sc1)
         assert(proposal.claimList.length === 2, `Expected 2 claimants, got ${proposal.claimList.length}`)
         assert(asBigInt(proposal.claimedReward) === claimedReward, `Expected claimedReward ${claimedReward}, got ${proposal.claimedReward}`)
-        console.log(`    Rewards (time-weighted, verified exact against formula): total +${ethers.formatEther(claimedReward)} LIB`)
+        console.log(`    Rewards (time-weighted, verified exact against formula): total +${ethers.formatEther(claimedReward)} WIN`)
       },
     ],
 
@@ -3068,7 +3068,7 @@ async function main(): Promise<void> {
             from: voter1.address,
             proposalId: daoProposalId(proposalN.sc5),
             weights: [1, 0],
-            spend: libToWei(minVoteSpendLib),
+            spend: wintoWei(minVoteSpendWin),
           },
           voter1,
           'voting',
@@ -3125,8 +3125,8 @@ async function main(): Promise<void> {
     [
       '6.3  Community votes no → dao_vote_result rejects and burns reward pool',
       async () => {
-        await castVote(proposalN.sc6, voter9, [1, 0], minVoteSpendLib)
-        await castVote(proposalN.sc6, voter10, [1, 0], minVoteSpendLib)
+        await castVote(proposalN.sc6, voter9, [1, 0], minVoteSpendWin)
+        await castVote(proposalN.sc6, voter10, [1, 0], minVoteSpendWin)
         const beforeResult = await getProposal(proposalN.sc6)
         const poolBeforeBurn = asBigInt(beforeResult.voterRewardPool)
         const { receipt } = await finalizeVote(proposalN.sc6, proposer4, SLEEP_BUFFER_MS)
@@ -3234,8 +3234,8 @@ async function main(): Promise<void> {
     [
       '7.3  Cast split votes and verify stable weight invariants',
       async () => {
-        const r1 = await castVote(proposalN.sc7, voter5, [3, 5, 2], minVoteSpendLib)
-        const r2 = await castVote(proposalN.sc7, voter6, [0, 1, 1], minVoteSpendLib * 2)
+        const r1 = await castVote(proposalN.sc7, voter5, [3, 5, 2], minVoteSpendWin)
+        const r2 = await castVote(proposalN.sc7, voter6, [0, 1, 1], minVoteSpendWin * 2)
         const w1 = r1.receipt.additionalInfo.optionWeights.map(asBigInt)
         const w2 = r2.receipt.additionalInfo.optionWeights.map(asBigInt)
         assert(w1.length === 3 && w2.length === 3, 'Expected receipt optionWeights length to match 3 proposal options')
@@ -3259,7 +3259,7 @@ async function main(): Promise<void> {
         const voterEntryBefore = before.voterList.find(v => v.address === voter5.address)
         assert(voterEntryBefore != null, 'Expected voter5 to be in voterList before repeated vote')
         const beforeTotal = before.totalVote.map(asBigInt)
-        const { receipt } = await castVote(proposalN.sc7, voter5, [1, 0, 2], minVoteSpendLib)
+        const { receipt } = await castVote(proposalN.sc7, voter5, [1, 0, 2], minVoteSpendWin)
         const addedWeights = receipt.additionalInfo.optionWeights.map(asBigInt)
         const after = await getProposal(proposalN.sc7)
         const afterTotal = after.totalVote.map(asBigInt)
@@ -3413,7 +3413,7 @@ async function main(): Promise<void> {
       '8.4  Economic proposal applies via apply_change_network_param',
       async () => {
         await committeeAcceptToVoting(proposalN.sc8Economic, proposer6, committee, SLEEP_BUFFER_MS, [1, 2, 3])
-        await castVote(proposalN.sc8Economic, voter7, [0, 0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc8Economic, voter7, [0, 0, 1], minVoteSpendWin)
         const { receipt: resultReceipt } = await finalizeVote(proposalN.sc8Economic, proposer6, SLEEP_BUFFER_MS)
         assert(resultReceipt.additionalInfo?.winningOptionIndex === 2, `Expected winningOptionIndex 2, got ${JSON.stringify(resultReceipt.additionalInfo)}`)
         await applyAcceptedProposal(proposalN.sc8Economic, proposer6, SLEEP_BUFFER_MS, committee, cycleDurationMs, async receipt => {
@@ -3433,7 +3433,7 @@ async function main(): Promise<void> {
       '8.5  Protocol section-object proposal applies via apply_change_config',
       async () => {
         await committeeAcceptToVoting(proposalN.sc8Protocol, proposer7, committee, SLEEP_BUFFER_MS, [0, 2, 4])
-        await castVote(proposalN.sc8Protocol, voter8, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc8Protocol, voter8, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc8Protocol, proposer7, SLEEP_BUFFER_MS)
         await applyAcceptedProposal(proposalN.sc8Protocol, proposer7, SLEEP_BUFFER_MS, committee, cycleDurationMs, async receipt => {
           await waitForListOfChangesFromReceipt(
@@ -3449,7 +3449,7 @@ async function main(): Promise<void> {
       '8.6  Protocol proposal with leaf keys: sibling merge under p2p + nested debug leaf',
       async () => {
         await committeeAcceptToVoting(proposalN.sc8LeafKey, proposer6, committee, SLEEP_BUFFER_MS, [0, 1, 2])
-        await castVote(proposalN.sc8LeafKey, voter7, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc8LeafKey, voter7, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc8LeafKey, proposer6, SLEEP_BUFFER_MS)
         await applyAcceptedProposal(proposalN.sc8LeafKey, proposer6, SLEEP_BUFFER_MS, committee, cycleDurationMs, async receipt => {
           const receiptChange = (receipt.additionalInfo?.change ?? {}) as any
@@ -3508,7 +3508,7 @@ async function main(): Promise<void> {
         const expectedMinVersion = sc8ArchiverMinVersionBefore || String(archiverBeforeApply?.minVersion)
         const expectedTopLevelActiveVersion = sc8TopLevelActiveVersionBefore || String(await getCurrentNetworkValue('activeVersion'))
         await committeeAcceptToVoting(proposalN.sc8Archiver, proposer7, committee, SLEEP_BUFFER_MS, [0, 1, 2])
-        await castVote(proposalN.sc8Archiver, voter8, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc8Archiver, voter8, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc8Archiver, proposer7, SLEEP_BUFFER_MS)
         await applyAcceptedProposal(proposalN.sc8Archiver, proposer7, SLEEP_BUFFER_MS, committee, cycleDurationMs, async receipt => {
           const receiptChange = (receipt.additionalInfo?.change ?? {}) as any
@@ -3858,11 +3858,11 @@ async function main(): Promise<void> {
     [
       '12.3 Early/min, early/high, and late/min votes show expected relative weights',
       async () => {
-        const earlyMin = await castVote(proposalN.sc12, voter9, [0, 1], minVoteSpendLib)
-        const earlyHigh = await castVote(proposalN.sc12, voter10, [0, 1], minVoteSpendLib * 3)
+        const earlyMin = await castVote(proposalN.sc12, voter9, [0, 1], minVoteSpendWin)
+        const earlyHigh = await castVote(proposalN.sc12, voter10, [0, 1], minVoteSpendWin * 3)
         const proposalBeforeLate = await getProposal(proposalN.sc12)
         await sleepUntilTimestamp(proposalBeforeLate.votingStart + Math.floor(proposalBeforeLate.votingDuration * 0.75), 'late second-half vote point', SLEEP_BUFFER_MS)
-        const lateMin = await castVote(proposalN.sc12, voter11, [0, 1], minVoteSpendLib)
+        const lateMin = await castVote(proposalN.sc12, voter11, [0, 1], minVoteSpendWin)
         const earlyMinWeight = asBigInt(earlyMin.receipt.additionalInfo.optionWeights[1])
         const earlyHighWeight = asBigInt(earlyHigh.receipt.additionalInfo.optionWeights[1])
         const lateMinWeight = asBigInt(lateMin.receipt.additionalInfo.optionWeights[1])
@@ -3939,9 +3939,9 @@ async function main(): Promise<void> {
         const voter12Balance = await getBalance(voter12.address)
         assert(voter12Balance !== null, `Expected voter12 account to exist before overspend validation`)
         const cases = [
-          { name: 'length mismatch', weights: [1, 0, 0], spend: libToWei(minVoteSpendLib), reason: 'length' },
-          { name: 'all zero', weights: [0, 0], spend: libToWei(minVoteSpendLib), reason: 'positive weight' },
-          { name: 'negative weight', weights: [1, -1], spend: libToWei(minVoteSpendLib), reason: undefined },
+          { name: 'length mismatch', weights: [1, 0, 0], spend: wintoWei(minVoteSpendWin), reason: 'length' },
+          { name: 'all zero', weights: [0, 0], spend: wintoWei(minVoteSpendWin), reason: 'positive weight' },
+          { name: 'negative weight', weights: [1, -1], spend: wintoWei(minVoteSpendWin), reason: undefined },
           { name: 'below minimum spend', weights: [1, 0], spend: 1n, reason: 'minimum required' },
           { name: 'spend upper bound', weights: [1, 0], spend: voter12Balance + 1n, reason: 'exceeds account balance' },
         ]
@@ -3964,7 +3964,7 @@ async function main(): Promise<void> {
     [
       '13.5 Accepted proposal still rejects apply before grace period',
       async () => {
-        await castVote(proposalN.sc13, voter11, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc13, voter11, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc13, proposer10, SLEEP_BUFFER_MS)
         const matchesRejectedChange = (change: any) => String(change?.appData?.dao?.pctBurned) === '58'
         const matchingChangesBefore = (await getProposalListOfChanges()).filter(matchesRejectedChange).length
@@ -4282,7 +4282,7 @@ async function main(): Promise<void> {
         }))
         saveCurrentRunState()
         await committeeAcceptToVoting(proposalN.sc15B, proposer3, committee, SLEEP_BUFFER_MS, [0, 2, 4])
-        await castVote(proposalN.sc15B, voter13, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc15B, voter13, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc15B, proposer3, SLEEP_BUFFER_MS)
         await injectExpectReject(
           {
@@ -4665,7 +4665,7 @@ async function main(): Promise<void> {
     [
       '18.3 Late dao_vote_result still gets the full claimDuration/gracePeriod',
       async () => {
-        await castVote(proposalN.sc18LateTransition, voter15, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc18LateTransition, voter15, [0, 1], minVoteSpendWin)
         // Re-fetch rather than reuse a variable from 18.2 — this step must also work standalone
         // (e.g. `--step 18.3` against an already-progressed network), and votingEnd is stable
         // once dao_committee_result has run, so re-deriving it here is equivalent.
@@ -4855,13 +4855,13 @@ async function main(): Promise<void> {
         const votingAccepted = await getProposal(proposalN.sc19CancelAccepted)
         assert(votingAccepted.status === 'voting', `Expected status 'voting', got '${votingAccepted.status}'`)
 
-        await castVote(proposalN.sc19CancelVoting, voter13, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc19CancelVoting, voter13, [0, 1], minVoteSpendWin)
       },
     ],
     [
       '19.4a Finalize sc19CancelAccepted to accepted',
       async () => {
-        await castVote(proposalN.sc19CancelAccepted, voter14, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc19CancelAccepted, voter14, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc19CancelAccepted, proposer9, SLEEP_BUFFER_MS)
         const proposal = await getProposal(proposalN.sc19CancelAccepted)
         assert(proposal.status === 'accepted', `Expected status 'accepted', got '${proposal.status}'`)
@@ -4978,7 +4978,7 @@ async function main(): Promise<void> {
       '19.11 Sanity: dao_vote/dao_vote_result reject sc19CancelVoting, dao_apply_parameters rejects sc19CancelAccepted',
       async () => {
         await injectExpectReject(
-          { type: 'dao_vote', networkId: currentNetworkId, from: voter13.address, proposalId: daoProposalId(proposalN.sc19CancelVoting), weights: [0, 1], spend: libToWei(minVoteSpendLib) },
+          { type: 'dao_vote', networkId: currentNetworkId, from: voter13.address, proposalId: daoProposalId(proposalN.sc19CancelVoting), weights: [0, 1], spend: wintoWei(minVoteSpendWin) },
           voter13,
           'voting',
         )
@@ -5078,7 +5078,7 @@ async function main(): Promise<void> {
         // Baseline re-derived from the index rather than carried in memory from 20.4, so a
         // --step rerun against an already-progressed network still tests something.
         const before = await waitForIndexEntry(proposalN.sc20Lifecycle, 'voting')
-        await castVote(proposalN.sc20Lifecycle, voter15, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc20Lifecycle, voter15, [0, 1], minVoteSpendWin)
         const entries = await getProposalIndexEntries()
         const after = entries.find(e => e.proposal === proposalN.sc20Lifecycle)
         assert(after != null, `Proposal #${proposalN.sc20Lifecycle} vanished from the index after dao_vote`)
@@ -5204,9 +5204,9 @@ async function main(): Promise<void> {
    * Deriving also means changing a fixture amount cannot leave an assertion quietly describing a
    * milestone that no longer exists.
    */
-  const sc21Cost = (n: number, rateUsdStr: string): bigint => usdStrToLibWei(sc21Milestones[n - 1].costUsdStr, rateUsdStr)
-  const sc21Bonus = (n: number, rateUsdStr: string): bigint => usdStrToLibWei(sc21Milestones[n - 1].bonusUsdStr, rateUsdStr)
-  const sc21Penalty = (n: number, rateUsdStr: string): bigint => usdStrToLibWei(sc21Milestones[n - 1].penaltyUsdStr, rateUsdStr)
+  const sc21Cost = (n: number, rateUsdStr: string): bigint => usdStrToWinWei(sc21Milestones[n - 1].costUsdStr, rateUsdStr)
+  const sc21Bonus = (n: number, rateUsdStr: string): bigint => usdStrToWinWei(sc21Milestones[n - 1].bonusUsdStr, rateUsdStr)
+  const sc21Penalty = (n: number, rateUsdStr: string): bigint => usdStrToWinWei(sc21Milestones[n - 1].penaltyUsdStr, rateUsdStr)
   /** Early delivery, and the amount escrowed per milestone: cost + bonus. */
   const sc21EarlyPayout = (n: number, rateUsdStr: string): bigint => sc21Cost(n, rateUsdStr) + sc21Bonus(n, rateUsdStr)
   /** Late delivery: no bonus, penalty off the cost. */
@@ -5302,8 +5302,8 @@ async function main(): Promise<void> {
         )
         await committeeAcceptToVoting(proposalN.sc21Project, committee[0], committee, SLEEP_BUFFER_MS)
         // Two voters: one claims mid-project, the other's share is what the burn later collects.
-        await castVote(proposalN.sc21Project, voter15, [0, 1], minVoteSpendLib)
-        await castVote(proposalN.sc21Project, voter14, [0, 1], minVoteSpendLib)
+        await castVote(proposalN.sc21Project, voter15, [0, 1], minVoteSpendWin)
+        await castVote(proposalN.sc21Project, voter14, [0, 1], minVoteSpendWin)
         await finalizeVote(proposalN.sc21Project, committee[0], SLEEP_BUFFER_MS)
         const proposal = await getProposal(proposalN.sc21Project)
         assert(proposal.status === 'accepted', `Expected accepted, got ${proposal.status}`)
@@ -5331,7 +5331,7 @@ async function main(): Promise<void> {
         const view = await getProject(proposalN.sc21Project)
         // Converted at the project's own stored rate, which also asserts the rate was snapshotted:
         // if rateUsdStr were left at its '0' default this conversion would throw or mismatch.
-        const expectedMint = usdSumToLibWei(view.project.rateUsdStr, ...sc21Milestones.flatMap(m => [m.costUsdStr, m.bonusUsdStr]))
+        const expectedMint = usdSumToWinWei(view.project.rateUsdStr, ...sc21Milestones.flatMap(m => [m.costUsdStr, m.bonusUsdStr]))
         assert(asBigInt(view.project.balance) === expectedMint, `Expected mint ${expectedMint}, got ${view.project.balance}`)
         // The receipt must report the same mint it performed, under the field name it publishes.
         assert(asBigInt(receipt.additionalInfo.mintedAmount) === expectedMint, `Expected receipt mintedAmount ${expectedMint}, got ${receipt.additionalInfo.mintedAmount}`)

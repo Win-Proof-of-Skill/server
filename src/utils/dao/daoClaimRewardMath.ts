@@ -5,7 +5,7 @@ const CLAIM_PRECISION = 10n ** 18n
 
 // Reward owed to one voter on a proposal.
 //
-// Policy formula (from Liberdus DAO Voting Policy):
+// Policy formula (from Win DAO Voting Policy):
 //   reward = voterRewardPool
 //            * ( timeDelta / votingDuration / 2
 //              + 1 / voterCount / 2 )

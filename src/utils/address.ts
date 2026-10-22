@@ -1,4 +1,4 @@
-import { LiberdusFlags } from '../config'
+import { WinFlags } from '../config'
 import * as crypto from '../crypto'
 import { ethers } from 'ethers'
 
@@ -9,7 +9,7 @@ import { ethers } from 'ethers'
  * @returns The Shardus address.
  **/
 export function toShardusAddress(addressStr: string): string {
-  if (LiberdusFlags.VerboseLogs) {
+  if (WinFlags.VerboseLogs) {
     console.log(`Running toShardusAddress`, typeof addressStr, addressStr)
   }
 

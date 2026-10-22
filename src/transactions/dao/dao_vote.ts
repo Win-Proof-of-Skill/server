@@ -92,15 +92,15 @@ export const validate = (
   const voteThresholdWei = utils.usdStrToWei(proposal.voteThresholdUsdStr, AccountsStorage.cachedNetworkAccount)
 
   if (tx.spend < minimumSpendWei) {
-    response.reason = `spend (${utils.weiToLib(tx.spend)} LIB) is less than the minimum required (${utils.weiToLib(minimumSpendWei)} LIB)`
+    response.reason = `spend (${utils.weiToWin(tx.spend)} WIN) is less than the minimum required (${utils.weiToWin(minimumSpendWei)} WIN)`
     return response
   }
   if (tx.spend > from.data.balance) {
-    response.reason = `spend (${utils.weiToLib(tx.spend)} LIB) exceeds account balance (${utils.weiToLib(from.data.balance)} LIB)`
+    response.reason = `spend (${utils.weiToWin(tx.spend)} WIN) exceeds account balance (${utils.weiToWin(from.data.balance)} WIN)`
     return response
   }
   if (from.data.balance < voteThresholdWei) {
-    response.reason = `account balance (${utils.weiToLib(from.data.balance)} LIB) is below the vote threshold (${utils.weiToLib(voteThresholdWei)} LIB)`
+    response.reason = `account balance (${utils.weiToWin(from.data.balance)} WIN) is below the vote threshold (${utils.weiToWin(voteThresholdWei)} WIN)`
     return response
   }
 

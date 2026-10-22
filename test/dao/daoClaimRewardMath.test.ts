@@ -1,12 +1,12 @@
 import { computeClaimReward } from '../../src/utils/dao/daoClaimRewardMath'
 
-const LIB = 10n ** 18n // 1 LIB in wei
+const WIN = 10n ** 18n // 1 WIN in wei
 const HOUR_MS = 3_600_000n
 const DAY_MS = 24n * HOUR_MS
 
 describe('computeClaimReward', () => {
-  // Shared pool used across most tests: 100 LIB post-initial-burn reward pool
-  const pool = 100n * LIB
+  // Shared pool used across most tests: 100 WIN post-initial-burn reward pool
+  const pool = 100n * WIN
   const votingDuration = 8n * DAY_MS // 8 days in ms
 
   // ─── timeDelta = 0 ──────────────────────────────────────────────────────────
@@ -80,12 +80,12 @@ describe('computeClaimReward', () => {
   // ─── exact formula check ─────────────────────────────────────────────────────
 
   test('exact formula output matches hand-computed value', () => {
-    // pool=100 LIB, timeDelta=2 days, votingDuration=8 days, voterCount=4
+    // pool=100 WIN, timeDelta=2 days, votingDuration=8 days, voterCount=4
     // timePart  = (2/8) * PRECISION = PRECISION/4
     // equalPart = PRECISION/4
-    // reward    = 100 LIB * (PRECISION/4 + PRECISION/4) / (2*PRECISION)
-    //           = 100 LIB * PRECISION/2 / (2*PRECISION)
-    //           = 100 LIB / 4 = 25 LIB
+    // reward    = 100 WIN * (PRECISION/4 + PRECISION/4) / (2*PRECISION)
+    //           = 100 WIN * PRECISION/2 / (2*PRECISION)
+    //           = 100 WIN / 4 = 25 WIN
     const PRECISION = 10n ** 18n
     const timeDelta = 2n * DAY_MS
     const timePart  = (timeDelta * PRECISION) / votingDuration // PRECISION/4
@@ -94,7 +94,7 @@ describe('computeClaimReward', () => {
 
     const reward = computeClaimReward(pool, timeDelta, votingDuration, 4n)
     expect(reward).toBe(expected)
-    expect(reward).toBe(25n * LIB)
+    expect(reward).toBe(25n * WIN)
   })
 
   // ─── rounding ────────────────────────────────────────────────────────────────

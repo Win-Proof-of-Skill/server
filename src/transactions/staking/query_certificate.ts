@@ -1,7 +1,7 @@
 import { nestedCountersInstance, Shardus, ShardusTypes } from '@shardus/core'
 import * as crypto from '../../crypto'
 import { Request } from 'express'
-import { LiberdusFlags } from '../../config'
+import { WinFlags } from '../../config'
 import { AccountAxiosResponse, AccountQueryResponse, UserAccount, ValidatorError } from '../../@types'
 import { getRandom, isValidAddress } from '../../utils'
 import { shardusGetFromNode, shardusPutToNode } from '../../utils/request'
@@ -60,32 +60,32 @@ export const validate_fields = (tx: QueryCertRequest): ShardusTypes.IncomingTran
   }
   if (isValidAddress(tx.nominator) === false) {
     response.reason = 'Invalid nominator address'
-    nestedCountersInstance.countEvent('liberdus-staking', `validate_fields fail tx.nominator address invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log('validate_fields fail tx.nominator address invalid', tx)
+    nestedCountersInstance.countEvent('win-staking', `validate_fields fail tx.nominator address invalid`)
+    if (WinFlags.VerboseLogs) console.log('validate_fields fail tx.nominator address invalid', tx)
     return response
   }
   if (isValidAddress(tx.nominee) === false) {
     response.reason = 'Invalid nominee address'
-    nestedCountersInstance.countEvent('liberdus-staking', ` fail tx.nominee address invalid`)
-    if (LiberdusFlags.VerboseLogs) console.log(' fail tx.nominee address invalid', tx)
+    nestedCountersInstance.countEvent('win-staking', ` fail tx.nominee address invalid`)
+    if (WinFlags.VerboseLogs) console.log(' fail tx.nominee address invalid', tx)
     return response
   }
   if (!tx.sign || !tx.sign.owner || !tx.sign.sig || tx.sign.owner !== tx.nominee) {
     response.reason = 'not signed by nominee account'
-    nestedCountersInstance.countEvent('liberdus-staking', `validate_fields fail not signed by nominee account`)
-    if (LiberdusFlags.VerboseLogs) console.log('validate_fields fail not signed by nominee account', tx)
+    nestedCountersInstance.countEvent('win-staking', `validate_fields fail not signed by nominee account`)
+    if (WinFlags.VerboseLogs) console.log('validate_fields fail not signed by nominee account', tx)
     return response
   }
   if (!crypto.verifyObj(tx, true)) {
     response.reason = 'Invalid signature for QueryCert tx'
-    nestedCountersInstance.countEvent('liberdus-staking', `validate_fields fail Invalid signature for QueryCert tx`)
-    if (LiberdusFlags.VerboseLogs) console.log('validate_fields fail Invalid signature for QueryCert tx', tx)
+    nestedCountersInstance.countEvent('win-staking', `validate_fields fail Invalid signature for QueryCert tx`)
+    if (WinFlags.VerboseLogs) console.log('validate_fields fail Invalid signature for QueryCert tx', tx)
     return response
   }
   response.success = true
   response.reason = 'query certificate tx is valid'
-  nestedCountersInstance.countEvent('liberdus-staking', `validate_fields query certificate tx is valid`)
-  if (LiberdusFlags.VerboseLogs) console.log('validate_fields query certificate tx is valid', tx)
+  nestedCountersInstance.countEvent('win-staking', `validate_fields query certificate tx is valid`)
+  if (WinFlags.VerboseLogs) console.log('validate_fields query certificate tx is valid', tx)
   return response
 }
 
@@ -130,9 +130,9 @@ export async function getCertSignatures(shardus: Shardus, certData: StakeCert): 
   const signedAppData = await shardus.getAppDataSignatures(
     'sign-stake-cert',
     crypto.hashObj(certData),
-    LiberdusFlags.MinStakeCertSig,
+    WinFlags.MinStakeCertSig,
     certData,
-    LiberdusFlags.ExtraNodesToSignStakeCert,
+    WinFlags.ExtraNodesToSignStakeCert,
   )
   if (!signedAppData.success) {
     return {
@@ -157,7 +157,7 @@ export async function queryCertificate(
   publicKey: string,
   activeNodes: ShardusTypes.ValidatorNodeDetails[],
 ): Promise<CertSignaturesResult | ValidatorError> {
-  nestedCountersInstance.countEvent('liberdus-staking', 'calling queryCertificate')
+  nestedCountersInstance.countEvent('win-staking', 'calling queryCertificate')
 
   if (activeNodes.length === 0) {
     return {
@@ -189,7 +189,7 @@ export async function queryCertificate(
 
   const nominator = accountQueryResponse.account?.nominator
   if (!nominator || nominator == '') {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`Nominator for this node account ${publicKey} is not found!`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`Nominator for this node account ${publicKey} is not found!`)
     return { success: false, reason: `Nominator for this node account ${publicKey} is not found!` }
   }
 
@@ -199,39 +199,39 @@ export async function queryCertificate(
   }
   const signedCertRequest: QueryCertRequest = shardus.signAsNode(certRequest)
 
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('signedCertRequest', signedCertRequest)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('signedCertRequest', signedCertRequest)
 
   return await callQueryCertificate(signedCertRequest)
 }
 
 export async function queryCertificateHandler(req: Request, shardus: Shardus): Promise<CertSignaturesResult | ValidatorError> {
-  nestedCountersInstance.countEvent('liberdus-staking', 'calling queryCertificateHandler')
+  nestedCountersInstance.countEvent('win-staking', 'calling queryCertificateHandler')
 
   const queryCertReq = req.body as QueryCertRequest
   const reqValidationResult = validate_fields(queryCertReq)
   if (!reqValidationResult.success) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: failed validateQueryCertRequest')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: failed validateQueryCertRequest')
     return reqValidationResult
   }
 
   const operatorAccount = await shardus.getLocalOrRemoteAccount(queryCertReq.nominator)
   if (!operatorAccount || !operatorAccount.data) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: failed to fetch operator account' + ' state')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: failed to fetch operator account' + ' state')
     return { success: false, reason: 'Failed to fetch operator account state' }
   }
   // is the norminator a user account?
   if (!isUserAccount(operatorAccount.data)) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: nominator is not a user account')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: nominator is not a user account')
     return { success: false, reason: 'nominator is not a user account' }
   }
   const nodeAccount = await shardus.getLocalOrRemoteAccount(queryCertReq.nominee)
   if (!nodeAccount) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: failed to fetch node account state')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: failed to fetch node account state')
     return { success: false, reason: 'Failed to fetch node account state' }
   }
   // Is the nominee a node account?
   if (!isNodeAccount(nodeAccount.data)) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: Nominee is not a node account')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: Nominee is not a node account')
     return { success: false, reason: 'Nominee is not a node account' }
   }
 
@@ -240,7 +240,7 @@ export async function queryCertificateHandler(req: Request, shardus: Shardus): P
   const currentTimestampInMillis = shardus.shardusGetTime()
 
   if (operatorAccountData.operatorAccountInfo == null) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: operator account info is null')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: operator account info is null')
     return {
       success: false,
       reason: 'Operator account info is null',
@@ -248,7 +248,7 @@ export async function queryCertificateHandler(req: Request, shardus: Shardus): P
   }
 
   if (operatorAccountData.operatorAccountInfo.certExp === null) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: Operator certificate time is null')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: Operator certificate time is null')
     return {
       success: false,
       reason: 'Operator certificate time is null',
@@ -257,7 +257,7 @@ export async function queryCertificateHandler(req: Request, shardus: Shardus): P
 
   // check operator cert validity
   if (operatorAccountData.operatorAccountInfo.certExp < currentTimestampInMillis) {
-    nestedCountersInstance.countEvent('liberdus-staking', 'queryCertificateHandler: operator certificate has expired')
+    nestedCountersInstance.countEvent('win-staking', 'queryCertificateHandler: operator certificate has expired')
 
     return {
       success: false,

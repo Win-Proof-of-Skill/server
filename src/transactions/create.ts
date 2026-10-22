@@ -77,7 +77,7 @@ export const apply = (
     },
   }
 
-  if (config.LiberdusFlags.versionFlags.createTxAppReceiptUpdate === false) {
+  if (config.WinFlags.versionFlags.createTxAppReceiptUpdate === false) {
     delete appReceiptData.additionalInfo
   }
   const appReceiptDataHash = crypto.hashObj(appReceiptData)

@@ -30,8 +30,8 @@ export const validate_fields = (tx: Tx.Message, response: ShardusTypes.IncomingT
     return response
   }
   const messageSizeInKb = Buffer.byteLength(tx.message, 'utf8') / 1024
-  if (messageSizeInKb > config.LiberdusFlags.messageSizeLimit) {
-    response.reason = `tx "message" size must be less than ${config.LiberdusFlags.messageSizeLimit} kB.`
+  if (messageSizeInKb > config.WinFlags.messageSizeLimit) {
+    response.reason = `tx "message" size must be less than ${config.WinFlags.messageSizeLimit} kB.`
     return response
   }
   if (!tx.sign || !tx.sign.owner || !tx.sign.sig || tx.sign.owner !== tx.from) {
@@ -148,7 +148,7 @@ export const apply = (
   let tollDeposited = 0n
   let totalToll = 0n
 
-  if (config.LiberdusFlags.VerboseLogs) {
+  if (config.WinFlags.VerboseLogs) {
     dapp.log(`Applying message tx: ${txId}`, tx, from, to, chat)
   }
 
@@ -173,7 +173,7 @@ export const apply = (
 
   // fail the tx if the chat is blocked
   if (chat.toll.required[receiverIndex] === 2) {
-    if (config.LiberdusFlags.VerboseLogs) dapp.log(`txId: ${txId} chat is blocked`, chat)
+    if (config.WinFlags.VerboseLogs) dapp.log(`txId: ${txId} chat is blocked`, chat)
     from.timestamp = txTimestamp
     dapp.log('Applied message tx', chat, from, to)
     return
@@ -238,7 +238,7 @@ export const apply = (
       chatId: tx.chatId,
     }
   }
-  if (config.LiberdusFlags.versionFlags.updateChatSenderTimestamp) {
+  if (config.WinFlags.versionFlags.updateChatSenderTimestamp) {
     // Update sender's receivedTimestamp and chatTimestamp when sending
     from.data.chats[tx.to].receivedTimestamp = txTimestamp
     from.data.chatTimestamp = txTimestamp
@@ -259,9 +259,9 @@ export const apply = (
     if (Array.isArray(chat.messages)) {
       chat.messages = chat.messages.filter((msg) => msg.timestamp >= cutoffTimestamp)
     }
-    if (config.LiberdusFlags.VerboseLogs && originalMessageCount !== chat.messages.length) {
+    if (config.WinFlags.VerboseLogs && originalMessageCount !== chat.messages.length) {
       dapp.log(`Messages after retention cleanup, kept ${chat.messages.length} of ${originalMessageCount}`)
-      nestedCountersInstance.countEvent('liberdus-message-retention', `cleaned-up due to messages older than ${network.current.messageRetentionDays} days`)
+      nestedCountersInstance.countEvent('win-message-retention', `cleaned-up due to messages older than ${network.current.messageRetentionDays} days`)
     }
   }
 
@@ -269,8 +269,8 @@ export const apply = (
   if (utils.isEqualOrNewerVersion('2.4.3', network.current.activeVersion) && chat.messages.length > network.current.messageMaxLength) {
     // Keep only the latest 800 messages
     chat.messages = chat.messages.slice(-network.current.messageMaxLength)
-    if (config.LiberdusFlags.VerboseLogs) dapp.log(`Messages after max length cleanup: ${chat.messages.length}`)
-    nestedCountersInstance.countEvent('liberdus-message-retention', `cleaned-up due to messages more than ${network.current.messageMaxLength}`)
+    if (config.WinFlags.VerboseLogs) dapp.log(`Messages after max length cleanup: ${chat.messages.length}`)
+    nestedCountersInstance.countEvent('win-message-retention', `cleaned-up due to messages more than ${network.current.messageMaxLength}`)
   }
 
   // Add message to chat
@@ -306,7 +306,7 @@ export const apply = (
     },
   }
 
-  if (config.LiberdusFlags.versionFlags.tollTaxFeeinAppReceipt === false) {
+  if (config.WinFlags.versionFlags.tollTaxFeeinAppReceipt === false) {
     if ('networkTollTaxFee' in appReceiptData.additionalInfo) delete appReceiptData.additionalInfo.networkTollTaxFee
   }
   const appReceiptDataHash = crypto.hashObj(appReceiptData)

@@ -1,5 +1,5 @@
 import { nestedCountersInstance, Shardus, ShardusTypes } from '@shardus/core'
-import config, { ONE_SECOND, LiberdusFlags } from '../../config'
+import config, { ONE_SECOND, WinFlags } from '../../config'
 import { getAccountWithRetry } from './query_certificate'
 import { AccountQueryResponse, TXTypes, WrappedStates, InjectTxResponse, NodeAccount, UserAccount, Tx, AppReceiptData, NetworkAccount } from '../../@types'
 import * as AccountsStorage from '../../storage/accountStorage'
@@ -18,7 +18,7 @@ import { isUserAccount, isNodeAccount } from '../../@types/accountTypeGuards'
 
 /** Keep the pre-2.5.2 fee until the network activates the new parameters. */
 export function getSetCertTimeFeeWei(network: NetworkAccount): bigint {
-  return LiberdusFlags.versionFlags.removeLegacyNetworkParams
+  return WinFlags.versionFlags.removeLegacyNetworkParams
     ? getTransactionFeeWei(network)
     : scaleByStabilityFactor(getLegacyTransactionFeeWei(network), network)
 }
@@ -27,7 +27,7 @@ export function getCertCycleDuration(): number {
   if (AccountsStorage.cachedNetworkAccount && AccountsStorage.cachedNetworkAccount.current.certCycleDuration !== null) {
     return AccountsStorage.cachedNetworkAccount.current.certCycleDuration
   }
-  return LiberdusFlags.certCycleDuration
+  return WinFlags.certCycleDuration
 }
 
 export async function injectSetCertTimeTx(shardus: Shardus, publicKey: string, activeNodes: ShardusTypes.ValidatorNodeDetails[]): Promise<InjectTxResponse> {
@@ -40,7 +40,7 @@ export async function injectSetCertTimeTx(shardus: Shardus, publicKey: string, a
   const nominator = nodeAccountQueryResponse.nominator
 
   if (!nominator) {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`Nominator for this node account ${publicKey} is not found!`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`Nominator for this node account ${publicKey} is not found!`)
     return { success: false, reason: `Nominator for this node account ${publicKey} is not found!` }
   }
 
@@ -50,17 +50,17 @@ export async function injectSetCertTimeTx(shardus: Shardus, publicKey: string, a
 
   const userAccountQueryResponse = nominatorAccountQueryResponse.account as UserAccount
   if (!userAccountQueryResponse.operatorAccountInfo) {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`Operator account info is not found in the nominator account ${nominator}!`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`Operator account info is not found in the nominator account ${nominator}!`)
     return { success: false, reason: `Operator account info is not found in the nominator account ${nominator}!` }
   }
 
   const committedStake = userAccountQueryResponse.operatorAccountInfo.stake
   const minStakeRequired = getStakeRequiredWei(AccountsStorage.cachedNetworkAccount)
 
-  if (LiberdusFlags.VerboseLogs)
+  if (WinFlags.VerboseLogs)
     console.log('operatorStake vs minStakeRequired', committedStake, minStakeRequired, 'isStakeEnough', committedStake < minStakeRequired)
   if (committedStake < minStakeRequired) {
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`Nominator ${nominator} has not enough committed stake`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`Nominator ${nominator} has not enough committed stake`)
     return { success: false, reason: `Nominator ${nominator} has not enough committed stake` }
   }
 
@@ -76,7 +76,7 @@ export async function injectSetCertTimeTx(shardus: Shardus, publicKey: string, a
   } as Tx.SetCertTime
   tx = shardus.signAsNode(tx)
   const result = await InjectTxToConsensor([randomConsensusNode], tx)
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('INJECTED_SET_CERT_TIME_TX', result, tx)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('INJECTED_SET_CERT_TIME_TX', result, tx)
   return result
 }
 
@@ -121,7 +121,7 @@ export const validate = (
 ): ShardusTypes.IncomingTransactionResult => {
   const operatorAccount = wrappedStates[tx.nominator].data as UserAccount
   const nodeAccount = wrappedStates[tx.nominee].data as NodeAccount
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('validateSetCertTime', tx, operatorAccount)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('validateSetCertTime', tx, operatorAccount)
   if (operatorAccount == undefined) {
     response.reason = `Found no wrapped state for operator account ${tx.nominator}`
     return response
@@ -131,7 +131,7 @@ export const validate = (
     return response
   }
   if (operatorAccount.operatorAccountInfo == null) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', 'validateSetCertTime' + ' Operator account info is null')
+    /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', 'validateSetCertTime' + ' Operator account info is null')
     response.reason = `Operator account info is null for operator account ${tx.nominator}`
     return response
   }
@@ -157,7 +157,7 @@ export const validate = (
   const committedStake = operatorAccount.operatorAccountInfo.stake
   const minStakeRequired = getStakeRequiredWei(AccountsStorage.cachedNetworkAccount)
 
-  if (LiberdusFlags.VerboseLogs)
+  if (WinFlags.VerboseLogs)
     console.log('validate operator stake', committedStake, minStakeRequired, ' committedStake < minStakeRequired : ', committedStake < minStakeRequired)
   if (committedStake < minStakeRequired) {
     response.reason = `Operator account stake is too low: ${committedStake} < ${minStakeRequired}`
@@ -176,10 +176,10 @@ export const apply = (
   dapp: Shardus,
   applyResponse: ShardusTypes.ApplyResponse,
 ): void => {
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`applySetCertTimeTx txTimestamp:${txTimestamp}   tx.timestamp:${tx.timestamp}`, tx)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`applySetCertTimeTx txTimestamp:${txTimestamp}   tx.timestamp:${tx.timestamp}`, tx)
 
   const operatorAccount = wrappedStates[tx.nominator].data as UserAccount
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('operatorAccount Before', operatorAccount)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('operatorAccount Before', operatorAccount)
   // Update state
   const serverConfig = config.server
   let shouldChargeTxFee = true
@@ -191,15 +191,15 @@ export const apply = (
     //use tx timestampe for a deterministic result
     const expiredPercentage = (txTimestamp - certStartTimestamp) / (certExp - certStartTimestamp)
 
-    /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`applySetCertTimeTx expiredPercentage: ${expiredPercentage}`)
+    /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`applySetCertTimeTx expiredPercentage: ${expiredPercentage}`)
 
     if (expiredPercentage >= 0.5) {
       // don't charge gas after 50% of the cert has
       // expired
       shouldChargeTxFee = false
-      /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', 'applySetCertTimeTx' + ' renew' + ' certExp chargeTxFee: false')
+      /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', 'applySetCertTimeTx' + ' renew' + ' certExp chargeTxFee: false')
     } else {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('liberdus-staking', 'applySetCertTimeTx' + ' renew' + ' certExp chargeTxFee: true')
+      /* prettier-ignore */ nestedCountersInstance.countEvent('win-staking', 'applySetCertTimeTx' + ' renew' + ' certExp chargeTxFee: true')
     }
   }
 
@@ -209,7 +209,7 @@ export const apply = (
   operatorAccount.operatorAccountInfo.certExp = txTimestamp + serverConfig.p2p.cycleDuration * ONE_SECOND * duration
 
   // deduct tx fee if certExp is not set yet or far from expiration
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log(`applySetCertTimeTx shouldChargeTxFee: ${shouldChargeTxFee}`)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log(`applySetCertTimeTx shouldChargeTxFee: ${shouldChargeTxFee}`)
 
   let costTxFee = BigInt(0)
   if (shouldChargeTxFee) {
@@ -217,7 +217,7 @@ export const apply = (
     operatorAccount.data.balance = SafeBigIntMath.subtract(operatorAccount.data.balance, costTxFee)
   }
 
-  /* prettier-ignore */ if (LiberdusFlags.VerboseLogs) console.log('operatorAccount After', operatorAccount)
+  /* prettier-ignore */ if (WinFlags.VerboseLogs) console.log('operatorAccount After', operatorAccount)
 
   operatorAccount.timestamp = txTimestamp
 
@@ -234,7 +234,7 @@ export const apply = (
     },
   }
 
-  if (LiberdusFlags.versionFlags.stakingAppReceiptUpdate === false) {
+  if (WinFlags.versionFlags.stakingAppReceiptUpdate === false) {
     appReceiptData.from = tx.nominator
     appReceiptData.to = tx.nominee
     delete appReceiptData.additionalInfo
@@ -264,7 +264,7 @@ export const createFailedAppReceiptData = (
     type: tx.type,
     transactionFee: BigInt(0),
   }
-  if (LiberdusFlags.versionFlags.stakingAppReceiptUpdate === false) {
+  if (WinFlags.versionFlags.stakingAppReceiptUpdate === false) {
     appReceiptData.from = tx.nominator
     appReceiptData.to = tx.nominee
   }

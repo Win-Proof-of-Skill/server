@@ -2,7 +2,7 @@ import { Utils } from '@shardus/lib-types'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import { AppReceiptData, NetworkAccount, Tx, UserAccount, WrappedStates } from '../src/@types'
 import { userAccount } from '../src/accounts/userAccount'
-import { INITIAL_PARAMETERS, LiberdusFlags } from '../src/config'
+import { INITIAL_PARAMETERS, WinFlags } from '../src/config'
 import * as crypto from '../src/crypto'
 import * as AccountsStorage from '../src/storage/accountStorage'
 import { getSetCertTimeFeeWei } from '../src/transactions/staking/set_cert_time'
@@ -11,7 +11,7 @@ import { getTransactionFeeWei, maintenanceAmount, usdStrToWei } from '../src/uti
 
 describe('legacy network parameter activation', () => {
   const originalCachedNetworkAccount = AccountsStorage.cachedNetworkAccount
-  const originalFlags = { ...LiberdusFlags.versionFlags }
+  const originalFlags = { ...WinFlags.versionFlags }
   const networkAt = (activeVersion: string, includeLegacyTransactionFee: boolean): NetworkAccount =>
     ({
       type: 'NetworkAccount',
@@ -29,16 +29,16 @@ describe('legacy network parameter activation', () => {
 
   afterEach(() => {
     AccountsStorage.setCachedNetworkAccount(originalCachedNetworkAccount)
-    Object.assign(LiberdusFlags.versionFlags, originalFlags)
+    Object.assign(WinFlags.versionFlags, originalFlags)
   })
 
   test('set_cert_time uses the old fee until the parameter-removal flag activates', () => {
     const before = networkAt('2.5.1', true)
     const after = networkAt('2.5.2', false)
 
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = false
+    WinFlags.versionFlags.removeLegacyNetworkParams = false
     expect(getSetCertTimeFeeWei(before)).toBe(125n * 10n ** 17n)
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = true
+    WinFlags.versionFlags.removeLegacyNetworkParams = true
     expect(getSetCertTimeFeeWei(after)).toBe(getTransactionFeeWei(after))
   })
 
@@ -48,7 +48,7 @@ describe('legacy network parameter activation', () => {
     const initialBalance = 10n ** 18n
     const chargeFailedWithdrawal = (network: NetworkAccount, removeLegacyNetworkParams: boolean): { balance: bigint; fee: bigint } => {
       AccountsStorage.setCachedNetworkAccount(network)
-      LiberdusFlags.versionFlags.removeLegacyNetworkParams = removeLegacyNetworkParams
+      WinFlags.versionFlags.removeLegacyNetworkParams = removeLegacyNetworkParams
       const account = { data: { balance: initialBalance }, timestamp: 0 } as UserAccount
       const wrappedStates = { USER: { data: account } } as unknown as WrappedStates
       const addReceiptData = jest.fn()
@@ -73,12 +73,12 @@ describe('legacy network parameter activation', () => {
     const timestamp = INITIAL_PARAMETERS.maintenanceInterval + 1
 
     const before = networkAt('2.5.1', true)
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = false
+    WinFlags.versionFlags.removeLegacyNetworkParams = false
     expect(maintenanceAmount(timestamp, account, before)).toBe(0n)
     expect(account.lastMaintenance).toBe(timestamp)
 
     const after = networkAt('2.5.2', false)
-    LiberdusFlags.versionFlags.removeLegacyNetworkParams = true
+    WinFlags.versionFlags.removeLegacyNetworkParams = true
     const nextTimestamp = timestamp + INITIAL_PARAMETERS.maintenanceInterval + 1
     expect(maintenanceAmount(nextTimestamp, account, after)).toBe(0n)
     expect(account.lastMaintenance).toBe(nextTimestamp)
