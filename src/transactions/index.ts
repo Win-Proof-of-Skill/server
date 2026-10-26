@@ -1,3 +1,4 @@
+import * as proofOfSkill from './proofOfSkill'
 import * as init_network from './init_network'
 import * as register from './register'
 import * as create from './create'
@@ -38,6 +39,10 @@ import * as dao_project_end from './dao/dao_project_end'
 import * as dao_project_reclaim_balance from './dao/dao_project_reclaim_balance'
 
 export default {
+  profile: proofOfSkill,
+  contract: proofOfSkill,
+  endorsement: proofOfSkill,
+  skill: proofOfSkill,
   init_network,
   register,
   create,

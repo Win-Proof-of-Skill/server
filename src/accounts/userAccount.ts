@@ -4,7 +4,11 @@ import * as crypto from '@shardus/lib-crypto-utils'
 import { SerdeTypeIdent } from '.'
 import * as utils from '../utils'
 import * as AccountsStorage from '../storage/accountStorage'
-import { INITIAL_PARAMETERS, WinFlags } from '../config'
+import {
+  INITIAL_PARAMETERS,
+  WinFlags,
+  isProtectedAddress,
+} from '../config'
 
 const populatedRetiredFieldsError = 'UserAccount binary codec does not support populated retired fields'
 
@@ -28,11 +32,19 @@ const hasPopulatedRetiredFields = (account: UserAccount): boolean => {
 export const userAccount = (accountId: string, timestamp: number): UserAccount => {
   // Ensure lowercase accountId
   accountId = accountId.toLowerCase()
+
+  if (isProtectedAddress(accountId)) {
+    throw new Error(
+      'A protected registry address cannot be a user wallet'
+    )
+  }
+
   const account: UserAccount = {
     id: accountId,
     type: 'UserAccount',
     data: {
-      balance: utils.wintoWei(50),
+      balance: 0n,
+      transferNonce: 0,
       toll: utils.getDefaultTollWei(AccountsStorage.cachedNetworkAccount ?? ({ current: INITIAL_PARAMETERS } as NetworkAccount)),
       tollUnit: TollUnit.win,
       chats: {},
@@ -55,6 +67,9 @@ export const userAccount = (accountId: string, timestamp: number): UserAccount =
 export const serializeUserAccount = (stream: VectorBufferStream, inp: UserAccount, root = false): void => {
   // Normal UserAccount objects use the JSON fallback. Keep this legacy binary
   // layout for direct callers, but never discard populated retired fields.
+  if ((inp.data.transferNonce ?? 0) !== 0) {
+    throw new Error('Use the JSON account codec to preserve the payment nonce')
+  }
   if (hasPopulatedRetiredFields(inp)) {
     throw new Error(populatedRetiredFieldsError)
   }

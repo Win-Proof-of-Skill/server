@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "deployments": {
+    "e7275795b34dabb07eee283f565249fe45cd667f5b3cb4d5df3c87973dc981d4": {
+      "tssAddress": null,
+      "vaultAddress": null,
+      "reserveCapWin": "100",
+      "observerUrls": []
+    }
+  }
+}

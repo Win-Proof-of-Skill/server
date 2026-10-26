@@ -2,70 +2,16 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 /**
- * =============================================================================
- * Win/Shardus client – interact with a node via the command line
- * =============================================================================
- *
- * USAGE
- *   node client.js [host:port] [archiveServer] [monitorServer] [faucetServer]
- *   Example: node client.js localhost:9002
- *
- * TESTING SETUP (dev keys)
- *   Create a key pair (see README "Creating a key pair for testing"), add the
- *   public key to src/config/index.ts in devPublicKeys (and multisigKeys),
- *   then set DEV_PUBLIC_KEY and DEV_PRIVATE_KEY in your environment or .env.
- *
- * -----------------------------------------------------------------------------
- * HOW TO USE THE CLIENT – step by step
- * -----------------------------------------------------------------------------
- *
- * 1. CREATE AN ACCOUNT (first terminal)
- *    - Run: node client.js localhost:9002
- *    - On "Enter wallet name:", type a name (e.g. alice) and press Enter.
- *    - Run: register
- *    - When prompted "Enter the alias you want:", use the SAME name as the
- *      wallet (e.g. alice). This keeps wallet name and account alias in sync.
- *    - After registration, the account is eligible for faucet funding (e.g. 50 WIN).
- *    - Run: faucet
- *    - Follow the prompts; your account will be funded.
- *
- * 2. SECOND ACCOUNT (for transfers and messages)
- *    - Open a second terminal in the same project directory.
- *    - Run: node client.js localhost:9002  (or another node, e.g. localhost:9004)
- *    - Enter a different wallet name (e.g. bob), then run: register
- *    - Use the same alias as the wallet name (e.g. bob).
- *    - Run: faucet to fund the second account.
- *
- * 3. USE THE CURRENT WALLET
- *    - use <name>   – switch to wallet <name> (e.g. use alice, use bob).
- *
- * 4. TRANSFER WIN BETWEEN ACCOUNTS
- *    - transfer
- *    - Enter target: alias or address (e.g. bob or the full public key).
- *    - Enter amount and memo as prompted.
- *
- * 5. SEND MESSAGES BETWEEN ACCOUNTS
- *    - message
- *    - Enter the alias or publicKey of the recipient (e.g. bob).
- *    - Enter your message when prompted.
- *    - read – read messages from another user (you may send a "read" tx).
- *
- * 6. QUERY VIA NODE HTTP API (e.g. from browser or curl)
- *    - Account:  GET http://localhost:9002/account/<accountId>
- *      Example:  http://localhost:9002/account/7e79d53c067e9d0a095c9675db38330ec72ffd5b000000000000000000000000
- *    - Transactions for an account:
- *      GET http://localhost:9002/account/<accountId>/transactions
- *      Example:  http://localhost:9004/account/f43eb22eb9ca0afe5f0fc620ba1ac932711eefe000000000000000000000000/transactions
- *    - Messages (chat) – the chatId is the first path segment after /messages/:
- *      GET http://localhost:9002/messages/<chatId>/0
- *      Example:  http://localhost:9002/messages/7569adbc2fd289d0e613eb488c7968988c41a5d8c2a1e1c4c038038d7c957955/0
- *      The response JSON includes a "messages" array; each message has chatId, from, message, etc.
- *      To derive chatId for two accounts: it is the hash of the sorted concatenation of the two
- *      account addresses (the client uses this for the "message poll" and "read" flows).
- *
- * Other useful commands: query, get, transactions, wallet list, use host <host>.
- * =============================================================================
+ * WIN manual client: node client.js [host:port]
+ * Default node: 127.0.0.1:9001. Start it with npm run local:start, then local:check.
+ * Use "testing" in the client for the manual-testing guide. Wallets start unfunded.
+ * Profiles/contracts use JSON content files; see docs/MANUAL_TESTING.md.
+ * Existing wallet.json keys are preserved and never printed by wallet commands.
  */
+if (process.argv.includes('--help')) {
+  console.log('Usage: node client.js [host:port] [archiveServer] [monitorServer] [faucetServer]\nDefault: 127.0.0.1:9001\nStart the network: npm run local:start; check readiness: npm run local:check\nInside the client: testing, network, wallet list, balance, transfer, receipt <txId>\nSee docs/MANUAL_TESTING.md. New wallets have no funds; no local faucet is configured.')
+  process.exit(0)
+}
 const fs = require('fs')
 const { resolve } = require('path')
 const path = require('path')
@@ -75,6 +21,8 @@ const stringify = require('fast-stable-stringify')
 const axios = require('axios')
 const { ethers } = require('ethers')
 const { Utils } = require('@shardus/lib-types')
+const win = require('./scripts/client-win')
+const { randomBytes } = require('crypto')
 require('dotenv').config()
 
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
@@ -87,14 +35,13 @@ const devKey = {
 
 const useEthereumSigning = true
 
-// BEFORE TESTING LOCALLY, CHANGE THE ADMIN_ADDRESS IN WIN-SERVER TO ONE YOU HAVE LOCALLY
 let USER
 const PROTOCOL = 'http'
-let HOST = process.argv[2] || 'localhost:9001'
-const HOST_IP = HOST.split(':')[0]
+let HOST = process.argv[2] || '127.0.0.1:9001'
+let HOST_IP = HOST.split(':')[0]
 const ARCHIVESERVER = process.argv[3] || 'localhost:4000'
 const MONITORSERVER = process.argv[4] || 'localhost:3000'
-const FAUCETSERVER = process.argv[5] || 'localhost:3344'
+const FAUCETSERVER = process.argv[5] || process.env.WIN_FAUCET_HOST
 console.log(`Using ${HOST} as node for queries and transactions.`)
 
 const network = '0'.repeat(64)
@@ -163,20 +110,26 @@ const ONE_DAY = 24 * ONE_HOUR
 const ONE_WEEK = 7 * ONE_DAY
 const ONE_YEAR = 365 * ONE_DAY
 
-const walletFile = resolve('./wallet.json')
+const walletFile = resolve(process.env.WIN_CLIENT_WALLET_FILE || path.join(__dirname, 'wallet.json'))
+const historyFile = resolve(process.env.WIN_CLIENT_HISTORY_FILE || path.join(__dirname, 'client-transactions.json'))
+let winClient = makeWinClient(HOST)
+function makeWinClient(host) {
+  return new win.WinClient(host, { expectedNetworkId: win.localNetworkId(host), historyFile })
+}
+async function connectWin() {
+  const protocol = await winClient.connect()
+  networkId = protocol.networkId
+  return protocol
+}
 const stakedNodeListsFile = resolve('./stakedNodeLists.json')
-const testConfigFile = resolve('./testConfig.json')
+const testConfigFile = resolve(__dirname, 'testConfig.json')
 const testConfigFromFile = require(testConfigFile)
 let walletEntries = {}
 
 const baseDir = '.'
 
-try {
-  walletEntries = require(walletFile)
-} catch (e) {
-  saveEntries(walletEntries, walletFile)
-  console.log(`Created wallet file '${walletFile}'.`)
-}
+walletEntries = win.readJson(walletFile, {})
+if (!walletEntries || Array.isArray(walletEntries) || typeof walletEntries !== 'object') throw new Error('Invalid wallet file; existing data was preserved')
 
 console.log(`Loaded wallet entries from '${walletFile}'.`)
 
@@ -199,8 +152,7 @@ async function getFullNodeList() {
 }
 
 function saveEntries(entries, file) {
-  const stringifiedEntries = JSON.stringify(entries, null, 2)
-  fs.writeFileSync(file, stringifiedEntries)
+  win.writePrivateJson(file, entries)
 }
 
 function createAccount(keys = null) {
@@ -211,7 +163,6 @@ function createAccount(keys = null) {
       // get uncompressed public key from the secretKey
       const signingKey = new ethers.SigningKey(wallet.privateKey)
       const uncompressedPublicKey = signingKey.publicKey
-      console.log('Uncompressed Public Key:', uncompressedPublicKey)
       return {
         address: toShardusAddress(wallet.address),
         keys: {
@@ -386,6 +337,7 @@ function toShardusAddress(addressStr) {
 }
 
 function signTransaction(tx, keys, useDefaultSigning = false) {
+  win.assertId(networkId, 'Connected network ID (run network to reconnect)')
   tx.networkId = networkId
   if (useEthereumSigning && !useDefaultSigning) {
     signEthereumTx(tx, keys ? keys : USER.keys)
@@ -399,6 +351,7 @@ function signEthereumTx(tx, keys) {
     throw new Error('Keys are required for signing')
   }
 
+  win.assertId(networkId, 'Connected network ID (run network to reconnect)')
   tx.networkId = networkId
   // Create a copy of the tx without any existing sign field
   const dataToSign = Object.assign({}, tx)
@@ -511,14 +464,13 @@ async function _sleep(ms = 0) {
 }
 
 async function injectTx(tx) {
-  const data = Utils.safeStringify(tx)
-  console.log('Tx data', data)
   try {
-    const res = await axios.post(`${PROTOCOL}://${HOST}/inject`, { tx: data })
-    return res.data
-  } catch (err) {
-    console.log('Error injecting tx:', err.message)
-    return err.message
+    const result = await winClient.submit(tx, message => vorpal.log(message))
+    vorpal.log(`${result.status}${result.reason ? ': ' + result.reason : ''}`)
+    return result
+  } catch (error) {
+    vorpal.log(error.message)
+    return { status: 'unknown', error: error.message }
   }
 }
 
@@ -558,18 +510,7 @@ async function getToll(friendId, yourId) {
 }
 
 async function getAddress(handle) {
-  if (handle.length === 64) return handle
-  try {
-    const res = await axios.get(`${PROTOCOL}://${HOST}/address/${crypto.hash(handle)}`)
-    const { address, error } = res.data
-    if (error) {
-      console.log(error)
-    } else {
-      return address
-    }
-  } catch (error) {
-    console.log(error)
-  }
+  return winClient.resolveTarget(handle, win.readJson(walletFile, walletEntries))
 }
 
 function calculateChatId(to, from) {
@@ -619,9 +560,16 @@ async function queryNodeParameters() {
 }
 
 // COMMAND TO SET THE HOST IP:PORT
-vorpal.command('use host <host>', 'uses <host> as the node for queries and transactions').action(function (args, callback) {
-  HOST = args.host
-  this.log(`Set ${args.host} as coin-app node for transactions.`)
+vorpal.command('use host <host>', 'connect to another WIN validator').action(async function (args, callback) {
+  try {
+    const next = makeWinClient(args.host)
+    const protocol = await next.connect()
+    winClient = next
+    HOST = args.host
+    HOST_IP = HOST.split(':')[0]
+    networkId = protocol.networkId
+    this.log(`Connected to ${HOST}; WIN network ${networkId}`)
+  } catch (error) { this.log(error.message) }
   callback()
 })
 
@@ -713,134 +661,50 @@ vorpal.command('change network parameters', 'Send a stringified JSON config obje
 })
 
 // COMMAND TO REGISTER AN ALIAS FOR A USER ACCOUNT
-vorpal.command('register', 'registers a unique alias for your account').action(async function (args, callback) {
-  const answers = await this.prompt([
-    {
-      type: 'input',
-      name: 'alias',
-      message: 'Enter the alias you want: ',
-    },
-    {
-      type: 'confirm',
-      name: 'private',
-      message: 'Do you want this account to be private? ',
-      default: false,
-    },
-  ])
-  const tx = {
-    type: 'register',
-    aliasHash: crypto.hash(answers.alias),
-    from: USER.address,
-    alias: answers.alias,
-    publicKey: USER.keys.publicKey,
-    private: answers.private,
-    timestamp: Date.now(),
-  }
-  if (useEthereumSigning) {
-    signEthereumTx(tx, USER.keys)
-  } else {
+vorpal.command('register', 'register an optional alias (does not fund the wallet)').action(async function (_, callback) {
+  try {
+    await connectWin()
+    const answers = await this.prompt([
+      { type: 'input', name: 'alias', message: 'Alias (1-20 letters/digits): ' },
+      { type: 'confirm', name: 'private', message: 'Private account? ', default: false },
+    ])
+    if (!/^[A-Za-z0-9]{1,20}$/.test(answers.alias)) throw new Error('Alias must contain 1-20 letters or digits')
+    const tx = { type: 'register', aliasHash: crypto.hash(answers.alias), from: USER.address,
+      alias: answers.alias, publicKey: USER.keys.publicKey, private: answers.private, timestamp: Date.now() }
     signTransaction(tx)
-  }
-  console.log(tx)
-  injectTx(tx).then((res) => {
-    this.log(res)
-    // Store the alias in the USER object and wallet entries if registration was successful
-    if (res && res.result && res.result.success) {
+    const result = await injectTx(tx)
+    if (result.status === 'confirmed') {
       USER.alias = answers.alias
-      // Update the wallet entry with the alias
-      for (const [name, entry] of Object.entries(walletEntries)) {
-        if (entry.address === USER.address) {
-          entry.alias = answers.alias
-          saveEntries(walletEntries, walletFile)
-          this.log(`Alias '${answers.alias}' saved to wallet`)
-          break
-        }
-      }
-    } else {
-      console.log('Alias registration failed')
+      walletEntries = win.readJson(walletFile, walletEntries)
+      for (const entry of Object.values(walletEntries)) if (entry.address === USER.address) entry.alias = answers.alias
+      saveEntries(walletEntries, walletFile)
+      this.log(`Alias '${answers.alias}' confirmed. Balance is unchanged.`)
     }
-    callback()
-    // verifyEthereumTx(tx)
-  })
+  } catch (error) { this.log(error.message) }
+  callback()
 })
 
-// COMMAND TO CREATE TOKENS FOR A USER ACCOUNT ON THE NETWORK (TEST ONLY)
-vorpal.command('create', 'creates tokens for an account').action(async function (args, callback) {
-  const answers = await this.prompt([
-    {
-      type: 'input',
-      name: 'target',
-      message: 'Enter the target account: ',
-    },
-    {
-      type: 'number',
-      name: 'amount',
-      message: 'Enter number of tokens to create: ',
-      default: 500,
-      filter: (value) => parseInt(value),
-    },
-  ])
-  const to = await getAddress(answers.target)
-  if (!to) {
-    this.log('Target account address does not exist')
-    callback()
-  } else {
-    const tx = {
-      type: 'create',
-      from: to,
-      amount: wintoWei(answers.amount),
-      timestamp: Date.now(),
-      networkId,
-    }
-    signTransaction(tx)
-    injectTx(tx).then((res) => {
-      this.log(res)
-      callback()
-    })
-  }
+vorpal.command('create', 'explain why public token creation is disabled').action(function (_, callback) {
+  this.log('Public token creation is disabled. New wallets start at 0 WIN. Local test funding is a separate step.')
+  callback()
 })
 
-// COMMAND TO TRANSFER TOKENS FROM ONE ACCOUNT TO ANOTHER
-vorpal.command('transfer', 'transfers tokens to another account').action(async function (_, callback) {
-  const answers = await this.prompt([
-    {
-      type: 'input',
-      name: 'target',
-      message: 'Enter the target account: ',
-    },
-    {
-      type: 'number',
-      name: 'amount',
-      message: 'How many tokens do you want to send: ',
-      default: 5,
-      filter: (value) => value,
-    },
-    {
-      type: 'input',
-      name: 'memo',
-      message: 'Enter a memo for the transaction: ',
-      maxLength: 140,
-    },
-  ])
-  const to = await getAddress(answers.target)
-  const amountInWei = wintoWei(parseFloat(answers.amount))
-  console.log(`Sending ${amountInWei} to ${to}`)
-  const tx = {
-    type: 'transfer',
-    from: USER.address,
-    to,
-    amount: amountInWei,
-    chatId: calculateChatId(to, USER.address),
-    memo: answers.memo ? answers.memo : null,
-    timestamp: Date.now(),
-    // deductTxFeeFromAmount: true,
-    //test: false
-  }
-  signTransaction(tx)
-  injectTx(tx).then((res) => {
-    this.log(res)
-    callback()
-  })
+vorpal.command('transfer', 'send WIN and wait for a committed receipt').action(async function (_, callback) {
+  try {
+    await connectWin()
+    const answers = await this.prompt([
+      { type: 'input', name: 'target', message: 'Recipient wallet name, alias, or address: ' },
+      { type: 'input', name: 'amount', message: 'Amount in WIN: ', default: '1' },
+      { type: 'input', name: 'memo', message: 'Memo (optional): ' },
+    ])
+    const to = await getAddress(answers.target)
+    const tx = await winClient.payment(USER, to, answers.amount, answers.memo)
+    this.log(`Recipient: ${to}\nAmount: ${weiToWinStr(tx.amount)} WIN\nFee: ${weiToWinStr(tx.fee)} WIN\nAmount + fee: ${weiToWinStr(tx.amount + tx.fee)} WIN\nNonce: ${tx.nonce}`)
+    const { confirmed } = await this.prompt({ type: 'confirm', name: 'confirmed', message: 'Send this payment?', default: false })
+    if (confirmed) await injectTx(tx)
+    else this.log('Payment canceled before submission.')
+  } catch (error) { this.log(error.message) }
+  callback()
 })
 
 vorpal.command('deposit stake', 'deposit the stake amount to the node').action(async function (args, callback) {
@@ -1128,7 +992,9 @@ vorpal
   .command('query [account]', 'gets data for the account associated with the given [wallet]. Otherwise, gets all network data.')
   .action(async function (args, callback) {
     let address
-    if (args.account !== undefined) address = walletEntries[args.account].address
+    if (args.account !== undefined) {
+      try { address = await getAddress(args.account) } catch (error) { this.log(error.message); callback(); return }
+    }
     this.log(`Querying network for ${address ? args.account : 'all data'} `)
     this.log(address)
     getAccountData(address).then((res) => {
@@ -1142,24 +1008,10 @@ vorpal
     })
   })
 
-// COMMAND TO SPAM THE NETWORK WITH A SPECIFIC TRANSACTION TYPE
-// TODO ADD WIN SPECIFIC TRANSACTIONS TO THIS
-vorpal
-  .command(
-    'spam transactions <type> <accounts> <count> <tps> <ports>',
-    'spams the network with <type> transactions <count> times, with <account> number of accounts, at <tps> transactions per second',
-  )
-  .action(async function (args, callback) {
-    const accounts = createAccounts(args.accounts)
-    const txs = makeTxGenerator(accounts, args.count, args.type)
-    const seedNodes = await getSeedNodes()
-    this.log('SEED_NODES:', seedNodes)
-    // const ports = seedNodes.map(url => url.port)
-    const nodes = seedNodes.map((url) => `${HOST_IP}:${url.port}`)
-    await spamTxs({ txs, rate: args.tps, nodes, saveFile: 'spam-test.json' })
-    this.log('Done spamming...')
-    callback()
-  })
+vorpal.command('spam transactions <type> <accounts> <count> <tps> <ports>', 'legacy load generator (unavailable without minting)').action(function (_, callback) {
+  this.log('Legacy load generation depends on disabled token minting. Use transfer with funded wallets instead.')
+  callback()
+})
 
 // COMMAND TO LOG OUT QUERY'S FOR NETWORK DATA (ISSUES - PROPOSALS - DEV_PROPOSALS)
 // TODO ADD MORE query's HERE
@@ -1199,63 +1051,59 @@ vorpal.command('get <type>', 'query the network for <type> account').action(asyn
   callback()
 })
 
-vorpal.command('init', 'sets the user wallet if it exists, else creates it').action(function (_, callback) {
-  this.prompt(
-    {
-      type: 'input',
-      name: 'user',
-      message: 'Enter wallet name: ',
-    },
-    async (result) => {
-      callback(null, vorpal.execSync('wallet create ' + result.user))
-      let res = await axios.get(`${PROTOCOL}://${HOST}/sync-newest-cycle`)
-      if (res.data == null || res.data.newestCycle == null) {
-        this.log('Error syncing with the network:')
-        networkId = 'fd1b56b08fd1e5035aa19eb631f7f1ad0395175c5d3dfc49411dfa528e6af7c3'
-      } else {
-        networkId = res.data.newestCycle.networkId
-        this.log('Network ID: ', networkId)
-      }
-    },
-  )
+function selectWallet(name) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) throw new Error('Wallet name must contain 1-64 letters, digits, underscores, or hyphens')
+  walletEntries = win.readJson(walletFile, {})
+  const existing = Object.prototype.hasOwnProperty.call(walletEntries, name) ? walletEntries[name] : null
+  if (['__proto__', 'constructor', 'prototype'].includes(name)) throw new Error('Choose another wallet name')
+  USER = existing || createEntry(name)
+  return USER
+}
+
+vorpal.command('init', 'select a wallet and connect to the WIN network').action(async function (_, callback) {
+  try {
+    const { user } = await this.prompt({ type: 'input', name: 'user', message: 'Enter wallet name: ', default: 'alice' })
+    selectWallet(user)
+    this.log(`Using ${user}: ${USER.address}`)
+    await connectWin()
+    this.log(`WIN network ID: ${networkId}`)
+  } catch (error) { networkId = ''; this.log(error.message) }
+  this.log('Type "testing" for the manual-testing guide. New wallets have no WIN funding.')
+  callback()
 })
 
-// COMMAND TO CREATE A LOCAL WALLET KEYPAIR
-vorpal.command('wallet create <name>', 'creates a wallet <name>').action(function (args, callback) {
-  if (typeof walletEntries[args.name] !== 'undefined' && walletEntries[args.name] !== null) {
-    return walletEntries[args.name]
-  } else {
-    console.log('Creating wallet for: ', args.name)
-    const user = createEntry(args.name, args.id)
-    console.log('User', user)
+vorpal.command('wallet create <name>', 'create/select a local wallet; does not issue WIN').action(function (args, callback) {
+  try {
+    const user = selectWallet(args.name)
+    this.log(`Using ${args.name}: ${user.address}`)
+    if (callback) callback()
     return user
-  }
+  } catch (error) { this.log(error.message); if (callback) callback() }
 })
 
-// COMMAND TO LIST ALL THE WALLET ENTRIES YOU HAVE LOCALLY
-vorpal.command('wallet list [name]', 'lists wallet for [name]. Otherwise, lists all wallets').action(function (args, callback) {
-  const wallet = walletEntries[args.name]
-  if (typeof wallet !== 'undefined' && wallet !== null) {
-    this.log(wallet)
-  } else {
-    this.log(walletEntries)
-  }
+vorpal.command('wallet list [name]', 'show saved wallet addresses (keys remain private)').action(function (args, callback) {
+  try {
+    walletEntries = win.readJson(walletFile, {})
+    for (const [name, entry] of Object.entries(walletEntries)) {
+      if (!args.name || args.name === name) this.log(`${name}: ${entry.address}${entry.alias ? ' | alias: ' + entry.alias : ''}`)
+    }
+  } catch (error) { this.log(error.message) }
   callback()
 })
 
-vorpal.command('use <name>', 'uses <name> wallet for transactions').action(function (args, callback) {
-  USER = vorpal.execSync('wallet create ' + args.name)
-  this.log('Now using wallet: ' + args.name)
-  if (USER.alias) {
-    this.log(`Alias: ${USER.alias}`)
-  } else {
-    this.log('No alias registered. Use "register" command to register an alias.')
-  }
+vorpal.command('use <name>', 'select or create a local wallet').action(function (args, callback) {
+  try { selectWallet(args.name); this.log(`Using ${args.name}: ${USER.address}`) } catch (error) { this.log(error.message) }
   callback()
 })
 
-vorpal.command('transactions', 'gets all the transactions for your account').action(async function (_, callback) {
-  this.log(await queryTransactions())
+vorpal.command('transactions', 'list transactions submitted by this client on the connected network').action(async function (_, callback) {
+  try {
+    await connectWin()
+    const entries = winClient.entries().filter(e => e.networkId === networkId && e.from === USER.address)
+    if (!entries.length) this.log('No locally recorded transactions for this wallet on this network.')
+    for (const entry of entries) this.log(`${entry.txId} | ${entry.type} | ${entry.status}${entry.objectId ? ' | object: ' + entry.objectId : ''}`)
+    this.log('Use receipt <txId> to refresh a status. This is the client journal, not complete network history.')
+  } catch (error) { this.log(error.message) }
   callback()
 })
 
@@ -1814,8 +1662,8 @@ const jsonStringifyReplacer = (key, value) => {
   return value
 }
 
-function wintoWei(won) {
-  return BigInt(win* 10 ** 18)
+function wintoWei(value) {
+  return ethers.parseEther(String(value))
 }
 
 function weiToWin(wei) {
@@ -1834,6 +1682,12 @@ function weiToWinStr(wei) {
 
 // COMMAND TO REQUEST TOKENS FROM THE FAUCET
 vorpal.command('faucet', 'requests tokens from the faucet server').action(async function (_, callback) {
+  if (!FAUCETSERVER) {
+    this.log('No faucet is configured. The local test network does not fund wallets automatically.')
+    callback()
+    return
+  }
+  try { await connectWin() } catch (error) { this.log(error.message); callback(); return }
   // Check if user has registered an alias
   if (!USER.alias) {
     this.log('You need to register an alias first using the "register" command')
@@ -2759,5 +2613,136 @@ vorpal.command('dao voters <number>', 'show the voter list and claim list for pr
   callback()
 })
 
+// Manual WIN testing commands. Keep legacy administration/DAO commands above.
+function manualCommand(command, description, action) {
+  vorpal.command(command, description).action(async function (args, callback) {
+    try { await action.call(this, args) } catch (error) { this.log(error.response?.data?.error || error.message) }
+    callback()
+  })
+}
+function showJson(ctx, value) {
+  ctx.log(JSON.stringify(value, (_, item) => typeof item === 'bigint' ? item.toString() : item, 2))
+}
+function readContent(file) {
+  const location = resolve(file)
+  if (fs.statSync(location).size > 256 * 1024) throw new Error('Content file exceeds 256 KiB')
+  return JSON.parse(fs.readFileSync(location, 'utf8'))
+}
+function writeTemplate(file, content) {
+  fs.writeFileSync(resolve(file), JSON.stringify(content, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+}
+async function confirmObject(ctx, tx) {
+  ctx.log(`Action: ${tx.type} ${tx.action}\nObject ID: ${tx.objectId}\nExpected revision: ${tx.expectedRevision}\nFee: ${weiToWinStr(tx.fee)} WIN`)
+  if (tx.requestHash) ctx.log(`Approval request hash: ${tx.requestHash}\nHiring profile: ${tx.hiringProfileId}`)
+  const { confirmed } = await ctx.prompt({ type: 'confirm', name: 'confirmed', message: 'Submit this transaction?', default: false })
+  if (confirmed) await injectTx(tx)
+  else ctx.log('Canceled before submission.')
+}
+
+manualCommand('testing', 'show the manual WIN testing guide', async function () {
+  this.log(`Manual WIN testing:
+  network                       Check connection, ID, fee, and processing cycle
+  bridge status                 Read bridge configuration and missing components
+  wallet create alice           Create/select a local wallet (0 WIN)
+  wallet create bob              Create/select another wallet
+  wallet list                   Show public addresses
+  use alice                     Select the sender
+  address                       Show the current wallet address
+  balance [wallet-or-address]   Read committed balance and payment nonce
+  register                      Optional alias registration; does not fund wallet
+  transfer                      Send WIN after reviewing amount, fee, and recipient
+  transactions                  Show this client's submission journal
+  receipt <txId>                Refresh a committed transaction status
+  profile template person person.json
+  profile create person.json    Save a profile; prints its object ID
+  profile get <id>              Read current profile and revision
+  profile update <id> <revision> person.json
+  contract template contract.json
+  contract create contract.json Save a work record without awarding score
+  contract get <id>             Inspect work status, revision, and approval hash
+  contract request <id>         Request approval from hiring profile controllers
+  contract approve <id> <hiringProfileId> <requestHash>
+  contract reject <id> <hiringProfileId> <requestHash>
+  score <profileId>             Read the profile's numerical score
+
+Profiles/contracts/payments require funded wallets. No local faucet is configured.
+Endorsement and skill creation are not implemented on the server yet.
+Edit generated JSON files before submission. See docs/MANUAL_TESTING.md.`)
+})
+manualCommand('network', 'check the current WIN network and payment fee', async function () {
+  const protocol = await connectWin()
+  this.log(`Node: ${HOST}\nNetwork ID: ${protocol.networkId}\nCurrency: WIN (18 decimals)\nTransfer fee: ${weiToWinStr(protocol.transferFee)} WIN`)
+  const cycle = await winClient.ready()
+  this.log(`Ready: cycle ${cycle.counter}, ${cycle.active} active validators.`)
+})
+manualCommand('address', 'show the selected wallet address', async function () {
+  this.log(USER ? USER.address : 'Select a wallet with use <name>.')
+})
+manualCommand('bridge status', 'read bridge configuration and reserve status (does not move funds)', async function () {
+  const protocol = await connectWin()
+  const status = await winClient.get('/bridge/status')
+  if (status.networkId !== protocol.networkId) throw new Error('Bridge status belongs to a different WIN network')
+  showJson(this, status)
+})
+manualCommand('balance [wallet]', 'read the balance and next payment nonce', async function (args) {
+  await connectWin()
+  const id = args.wallet ? await getAddress(args.wallet) : USER.address
+  const account = await winClient.account(id)
+  this.log(`Address: ${id}`)
+  if (!account) { this.log('0 WIN — wallet has no committed account yet. No automatic funding is available.'); return }
+  if (account.type !== 'UserAccount') throw new Error('This address is not a wallet account')
+  this.log(`Balance: ${weiToWinStr(account.data.balance)} WIN\nNext payment nonce: ${(account.data.transferNonce ?? 0) + 1}${account.alias ? '\nAlias: ' + account.alias : ''}`)
+})
+manualCommand('receipt <id>', 'read a committed receipt; absence means pending/unknown', async function (args) {
+  const result = await winClient.receipt(args.id)
+  this.log(`${result.txId}: ${result.status}`)
+  if (result.receipt) showJson(this, result.receipt)
+  else this.log(result.reason)
+})
+manualCommand('profile template <type> <file>', 'write a new profile content template (never overwrite)', async function (args) {
+  writeTemplate(args.file, win.profileTemplate(args.type))
+  this.log(`Created ${resolve(args.file)}. Edit it before running profile create.`)
+})
+manualCommand('contract template <file>', 'write a historical contract template (never overwrite)', async function (args) {
+  writeTemplate(args.file, win.contractTemplate())
+  this.log(`Created ${resolve(args.file)}. Replace the worker/hiring profile IDs and work details before submission.`)
+})
+for (const kind of ['profile', 'contract']) {
+  manualCommand(`${kind} get <id>`, `read the current committed ${kind}`, async function (args) {
+    showJson(this, await winClient.record(`${kind}s`, args.id))
+  })
+  manualCommand(`${kind} create <file> [id]`, `create a ${kind} from a JSON content file`, async function (args) {
+    const tx = await winClient.objectTransaction(USER, kind, 'create', args.id || randomBytes(32).toString('hex'), 0, { payload: readContent(args.file) })
+    await confirmObject(this, tx)
+  })
+  manualCommand(`${kind} update <id> <revision> <file>`, `replace ${kind} content at the revision you reviewed`, async function (args) {
+    if (!/^[1-9][0-9]*$/.test(String(args.revision))) throw new Error('Use the committed revision shown by the get command')
+    const tx = await winClient.objectTransaction(USER, kind, 'update', args.id, Number(args.revision), { payload: readContent(args.file) })
+    await confirmObject(this, tx)
+  })
+}
+for (const [command, action] of [['request', 'request_approval'], ['expire', 'expire'], ['approve', 'approve'], ['reject', 'reject']]) {
+  const decision = action === 'approve' || action === 'reject'
+  manualCommand(`contract ${command} <id>${decision ? ' <hiringProfileId> <requestHash>' : ''}`, `${command} the current contract approval request`, async function (args) {
+    const { record } = await winClient.record('contracts', args.id)
+    showJson(this, record)
+    const extra = {}
+    if (decision) {
+      win.assertId(args.hiringProfileId, 'Hiring profile ID')
+      win.assertId(args.requestHash, 'Request hash')
+      if (record.approvalRequest?.hash !== args.requestHash) throw new Error('Request hash differs from the committed contract. Review contract get before approving.')
+      extra.hiringProfileId = args.hiringProfileId
+      extra.requestHash = args.requestHash
+      if (action === 'reject') extra.reason = (await this.prompt({ type: 'input', name: 'reason', message: 'Rejection reason: ' })).reason
+    }
+    const tx = await winClient.objectTransaction(USER, 'contract', action, args.id, record.revision, extra)
+    await confirmObject(this, tx)
+  })
+}
+manualCommand('score <id>', 'read the numerical score of a profile', async function (args) {
+  const { record } = await winClient.record('scores', args.id)
+  this.log(`Stored score: ${record} (integer millionths)\nScore: ${ethers.formatUnits(BigInt(record), 6)}`)
+})
+
 vorpal.delimiter('>').show()
-vorpal.exec('init').then((res) => (USER = res))
+vorpal.exec('init').catch(error => vorpal.log(error.message))

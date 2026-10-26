@@ -1,3 +1,4 @@
+import { assertTransactionAccountAccess, isProofOfSkillTransaction } from './domain/routing'
 import { DevSecurityLevel, nestedCountersInstance, Shardus, shardusFactory, ShardusTypes } from '@shardus/core'
 import account from './accounts'
 import { deserializeAppData, serializeAppData } from './accounts/appDataSerialization'
@@ -26,10 +27,11 @@ import { configShardusNetworkTransactions } from './transactions/networkTransact
 import { initAjvSchemas, verifyPayload } from './@types/ajvHelper'
 import { operatorCLIVersion, operatorGUIVersion, readOperatorVersions } from './utils/versions'
 import { onActiveVersionChange } from './versioning/index'
-import genesis from './config/genesis.json'
 import rfdc = require('rfdc')
 import { getHeapStatistics } from 'v8'
 import create from './accounts'
+import fs from 'fs'
+import path from 'path'
 const { version } = require('./../package.json')
 
 dotenv.config()
@@ -120,7 +122,7 @@ const shardusSetup = (): void => {
           type: 'init_network',
           timestamp: when,
           network: configs.networkAccount,
-          networkId: latestCycle.networkId,
+          networkId: configs.WIN_NETWORK_ID,
         }
 
         dapp.setGlobal(
@@ -134,62 +136,10 @@ const shardusSetup = (): void => {
 
         dapp.log(`node ${nodeId} GENERATED_A_NEW_NETWORK_ACCOUNT: `)
 
-        /* Genesis account */
-
-        type GenesisBalances = {
-          [address: string]: {
-            alias: string
-            publicKey: string
-            balance: string
-          }
-        }
-
-        const genesisLoaded = genesis as GenesisBalances
+        // Bootstrap only the system authority records. Wallet balances and aliases
+        // are never preallocated; funding requires a separately authorized mechanism.
         let accountCopies: ShardusTypes.AccountsCopy[] = []
         const currentCycle = dapp.getLatestCycles(1)[0]
-
-        for (const address in genesisLoaded) {
-          const accountId = address
-
-          if (await dapp.getLocalOrRemoteAccount(accountId)) {
-            continue
-          }
-
-          const userAccount = account.userAccount(accountId, currentCycle.start)
-
-          userAccount.alias = genesisLoaded[address].alias
-          userAccount.publicKey = genesisLoaded[address].publicKey
-          userAccount.timestamp = currentCycle.start * 1000
-          userAccount.data.balance = BigInt(genesisLoaded[address].balance)
-          userAccount.hash = ''
-          userAccount.hash = crypto.hashObj(userAccount)
-
-          const constructedShardusAccount = {
-            accountId: accountId,
-            cycleNumber: currentCycle.counter,
-            data: userAccount,
-            timestamp: userAccount.timestamp,
-            isGlobal: false,
-            hash: userAccount.hash,
-          }
-
-          accountCopies.push(constructedShardusAccount)
-
-          const aliasAccount = account.aliasAccount(crypto.hash(genesisLoaded[address].alias))
-          aliasAccount.address = userAccount.id
-          aliasAccount.timestamp = currentCycle.start * 1000
-          aliasAccount.hash = ''
-          aliasAccount.hash = crypto.hashObj(aliasAccount)
-
-          accountCopies.push({
-            accountId: crypto.hash(genesisLoaded[address].alias),
-            cycleNumber: currentCycle.counter,
-            data: aliasAccount,
-            timestamp: currentCycle.start,
-            isGlobal: false,
-            hash: aliasAccount.hash,
-          })
-        }
 
         //TODO we need to brainstorm a way to allow migration of keys on a live network
         const devPublicKeys = dapp.getDevPublicKeys()
@@ -235,6 +185,11 @@ const shardusSetup = (): void => {
       }
       try {
         const { tx } = timestampedTx
+
+        if (AccountsStorage.cachedNetworkAccount && AccountsStorage.cachedNetworkAccount.networkId !== configs.WIN_NETWORK_ID) {
+          validationResult.reason = 'Stored ledger belongs to a different application network; use the matching deployment'
+          return validationResult
+        }
 
         // 1. Validate the tx network id
         if (utils.isValidNetworkId(tx, dapp) === false) {
@@ -287,6 +242,8 @@ const shardusSetup = (): void => {
         // 5. Validate the tx data
         const res = transactions[tx.type].validate_fields(tx, validationResult, dapp)
         if (res.success) {
+          const declared = transactions[tx.type].keys(tx, { sourceKeys: [], targetKeys: [], allKeys: [], timestamp: txnTimestamp })
+          assertTransactionAccountAccess(tx, [...declared.sourceKeys, ...declared.targetKeys, ...declared.allKeys])
           validationResult.reason = 'This transaction is valid!'
           validationResult.status = 200
         }
@@ -319,6 +276,12 @@ const shardusSetup = (): void => {
       } as ShardusTypes.TransactionKeys
       const keys = transactions[tx.type].keys(tx, result)
 
+      assertTransactionAccountAccess(tx, [
+        ...keys.sourceKeys,
+        ...keys.targetKeys,
+        ...keys.allKeys,
+      ])
+
       // TODO: this can be removed after we passed version 2.3.4
       if (
         AccountsStorage?.cachedNetworkAccount &&
@@ -348,6 +311,14 @@ const shardusSetup = (): void => {
       //@ts-ignore
       const { tx } = timestampedTx
       const txTimestamp = utils.getInjectedOrGeneratedTimestamp(timestampedTx, dapp)
+
+      try {
+        assertTransactionAccountAccess(tx, Object.keys(wrappedStates))
+      } catch (error) {
+        const response = dapp.createApplyResponse(utils.generateTxId(tx), txTimestamp)
+        dapp.applyResponseSetFailed(response, error.message)
+        return response
+      }
 
       const preApplyStatus = {
         success: false,
@@ -487,6 +458,9 @@ const shardusSetup = (): void => {
     async getRelevantData(accountId: string, timestampedTx: any): Promise<ShardusTypes.WrappedResponse> {
       console.log('getRelevantData', accountId, timestampedTx)
       const { tx } = timestampedTx
+
+      assertTransactionAccountAccess(tx, [accountId])
+
       const account = await AccountsStorage.getAccount(accountId)
       const accountCreated = false
       return transactions[tx.type].createRelevantAccount(dapp, account, accountId, tx, accountCreated)
@@ -787,16 +761,14 @@ const shardusSetup = (): void => {
           } else {
             if (statsDebugLogs)
               dapp.log(
-                `error: null balance attempt. dataSummaryUpdate UserAccount 1 ${accountDataAfter.data.balance} ${Utils.safeStringify(accountDataAfter.id)} ${
-                  accountDataBefore.data.balance
+                `error: null balance attempt. dataSummaryUpdate UserAccount 1 ${accountDataAfter.data.balance} ${Utils.safeStringify(accountDataAfter.id)} ${accountDataBefore.data.balance
                 } ${Utils.safeStringify(accountDataBefore.id)}`,
               )
           }
         } else {
           if (statsDebugLogs)
             dapp.log(
-              `error: null balance attempt. dataSummaryUpdate UserAccount 2 ${accountDataAfter.data.balance} ${Utils.safeStringify(accountDataAfter.id)} ${
-                accountDataBefore.data.balance
+              `error: null balance attempt. dataSummaryUpdate UserAccount 2 ${accountDataAfter.data.balance} ${Utils.safeStringify(accountDataAfter.id)} ${accountDataBefore.data.balance
               } ${Utils.safeStringify(accountDataBefore.id)}`,
             )
         }
@@ -863,6 +835,20 @@ const shardusSetup = (): void => {
       return false
     },
     async txPreCrackData(tx: any, appData: any): Promise<{ status: boolean; reason: string }> {
+      if (isProofOfSkillTransaction(tx.type)) {
+        const fields = this.validate({ tx }, appData)
+        if (!fields.success) return { status: false, reason: fields.reason }
+        try {
+          const declared = this.crack({ tx }, appData).keys
+          const states: WrappedStates = {}
+          for (const id of declared.allKeys) {
+            const stored = await dapp.getLocalOrRemoteAccount(id, { useRICache: false, canThrowException: true })
+            states[id] = transactions[tx.type].createRelevantAccount(dapp, stored?.data, id, tx, false)
+          }
+          const result = transactions[tx.type].validate(tx, states, { success: false, reason: '' }, dapp)
+          return { status: result.success, reason: result.reason ?? '' }
+        } catch (error) { return { status: false, reason: error.message } }
+      }
       const preCrackableTxTypes = [
         TXTypes.transfer,
         TXTypes.message,
@@ -929,6 +915,10 @@ const shardusSetup = (): void => {
         if (to) {
           promises.push(
             dapp.getLocalOrRemoteAccount(to).then((queuedWrappedState) => {
+              if (!queuedWrappedState && tx.type === TXTypes.transfer) {
+                wrappedStates[to] = transactions.transfer.createRelevantAccount(dapp, null, to, tx, false) as WinTypes.WrappedAccount
+                return
+              }
               wrappedStates[to] = {
                 accountId: queuedWrappedState.accountId,
                 stateId: queuedWrappedState.stateId,
@@ -1443,7 +1433,7 @@ const shardusSetup = (): void => {
           /* prettier-ignore */
           nestedCountersInstance.countEvent('win-staking', 'validateJoinRequest fail: stake_cert.signs == null || stake_cert.signs.length < WinFlags.MinStakeCertSig')
           /* prettier-ignore */
-          if (WinFlags.VerboseLogs) console.log(`validateJoinRequest fail: stake_cert.signs == null || stake_cert.signs.length < WinFlags.MinStakeCertSig ${stake_cert.signs} || ${stake_cert.signs?.length} < ${WinFlags.MinStakeCertSig}` )
+          if (WinFlags.VerboseLogs) console.log(`validateJoinRequest fail: stake_cert.signs == null || stake_cert.signs.length < WinFlags.MinStakeCertSig ${stake_cert.signs} || ${stake_cert.signs?.length} < ${WinFlags.MinStakeCertSig}`)
           return {
             success: false,
             reason: `Not enough signatures in the certificate.`,
@@ -1561,7 +1551,7 @@ const shardusSetup = (): void => {
       isReadyToJoinLatestValue = false
       mustUseAdminCert = false
       // query admin cert from the golden ticket server
-      if (networkAccount && utils.isEqualOrNewerVersion('2.4.3', networkAccount.current.activeVersion)) {
+      if (!configs.IS_LOCAL_TEST && networkAccount && utils.isEqualOrNewerVersion('2.4.3', networkAccount.current.activeVersion)) {
         await fetchGoldenTicketIfNeeded(publicKey, networkAccount, dapp)
       }
       console.log('is AdminCert set to ', adminCert)
@@ -2356,7 +2346,7 @@ async function updateConfigFromNetworkAccount(
 }
 
 // CODE THAT GETS EXECUTED WHEN NODES START
-;(async (): Promise<void> => {
+; (async (): Promise<void> => {
   await setupArchiverDiscovery({
     customArchiverList: config.server.p2p?.existingArchivers,
   })
@@ -2398,6 +2388,21 @@ async function updateConfigFromNetworkAccount(
 
   dapp = shardusFactory(configToLoad)
   shardusConfig = dapp.config
+  if (configs.IS_LOCAL_TEST) {
+    // A private filesystem signal lets the local launcher request a consensus
+    // shutdown checkpoint before stopping the processes. No HTTP endpoint is added.
+    const shutdownFile = path.join(config.server.baseDir, 'shutdown-request.json')
+    const shutdownWatch = setInterval(() => {
+      if (!fs.existsSync(shutdownFile)) return
+      try {
+        const request = JSON.parse(fs.readFileSync(shutdownFile, 'utf8'))
+        if (request.networkId === configs.WIN_NETWORK_ID) dapp.config.p2p.initShutdown = true
+      } catch (error) {
+        console.error('Invalid local shutdown request:', error.message)
+      }
+    }, 1000)
+    shutdownWatch.unref()
+  }
   console.log(`Heap Size Limit: ${getHeapStatistics().heap_size_limit / 1024 / 1024} MB`)
 
   registerAPI(dapp)

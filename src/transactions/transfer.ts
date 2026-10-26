@@ -1,4 +1,5 @@
 import * as crypto from '../crypto'
+import { formulas } from '../config/formulas'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import * as utils from '../utils'
 import * as config from '../config'
@@ -15,6 +16,18 @@ export const validate_fields = (tx: Tx.Transfer, response: ShardusTypes.Incoming
   }
   if (utils.isValidAddress(tx.to) === false) {
     response.reason = 'tx "to" is not a valid address.'
+    return response
+  }
+  if ([tx.from, tx.to, tx.chatId].some(config.isProtectedAddress)) {
+    response.reason = 'Payments cannot use protected registry addresses'
+    return response
+  }
+  if (!Number.isSafeInteger(tx.nonce) || tx.nonce < 1) {
+    response.reason = 'Payment nonce must be a positive safe integer'
+    return response
+  }
+  if (typeof tx.fee !== 'bigint' || tx.fee !== formulas.transferFee) {
+    response.reason = `Payment fee must be exactly ${formulas.transferFee} atomic WIN`
     return response
   }
   if (typeof tx.amount !== 'bigint' || tx.amount <= BigInt(0)) {
@@ -43,7 +56,7 @@ export const validate_fields = (tx: Tx.Transfer, response: ShardusTypes.Incoming
       return response
     }
     if (tx.deductTxFeeFromAmount === true) {
-      const transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
+      const transactionFee = formulas.transferFee
       if (tx.amount <= transactionFee) {
         response.reason = 'transfer amount must be greater than the transaction fee when deductTxFeeFromAmount is true'
         return response
@@ -94,6 +107,11 @@ export const validate = (
     return response
   }
 
+  if (tx.nonce !== (from.data.transferNonce ?? 0) + 1) {
+    response.reason = 'Payment nonce has already been consumed or is out of sequence'
+    return response
+  }
+
   const fromPrivate = from.private || false
   const toPrivate = to.private || false
 
@@ -102,17 +120,17 @@ export const validate = (
     return response
   }
 
-  const transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
+  const transactionFee = formulas.transferFee
   const deductTxFeeFromAmount =
     config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
     tx.deductTxFeeFromAmount === true
 
-  if (deductTxFeeFromAmount === false && from.data.balance < tx.amount + transactionFee) {
+  if (deductTxFeeFromAmount === false && from.data.balance < tx.amount + transactionFee + utils.maintenanceAmount(tx.timestamp, from, network)) {
     response.reason = "from account doesn't have sufficient balance to cover the transaction"
     return response
   }
   if (deductTxFeeFromAmount === true) {
-    if (from.data.balance < tx.amount) {
+    if (from.data.balance < tx.amount + utils.maintenanceAmount(tx.timestamp, from, network)) {
       response.reason = "from account doesn't have sufficient balance to cover the transfer amount"
       return response
     }
@@ -159,7 +177,7 @@ export const validate = (
     }
   }
   if (network) {
-    if (utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount) > tx.fee) {
+    if (formulas.transferFee > tx.fee) {
       response.success = false
       response.reason = `The network transaction fee (${utils.getTransactionFeeWei(
         AccountsStorage.cachedNetworkAccount,
@@ -185,8 +203,12 @@ export const apply = (
   const chat: ChatAccount = wrappedStates[tx.chatId].data
   const network = AccountsStorage.cachedNetworkAccount
 
+  if (tx.nonce !== (from.data.transferNonce ?? 0) + 1) throw new Error('Payment nonce mismatch')
+  // Consume the nonce atomically with the balance changes.
+  from.data.transferNonce = tx.nonce
+
   // update balances
-  const transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
+  const transactionFee = formulas.transferFee
   const maintenanceFee = utils.maintenanceAmount(txTimestamp, from, network)
   const deductTxFeeFromAmount =
     config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
@@ -231,6 +253,7 @@ export const apply = (
   }
 
   const appReceiptData: AppReceiptData = {
+    networkId: tx.networkId,
     txId,
     timestamp: txTimestamp,
     success: true,
@@ -254,21 +277,12 @@ export const createFailedAppReceiptData = (
   applyResponse: ShardusTypes.ApplyResponse,
   reason: string,
 ): void => {
-  // Deduct transaction fee from the sender's balance
-  const from: UserAccount = wrappedStates[tx.from].data
-  let transactionFee = BigInt(0)
-  if (from !== undefined && from !== null) {
-    if (from.data.balance >= utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)) {
-      transactionFee = utils.getTransactionFeeWei(AccountsStorage.cachedNetworkAccount)
-      from.data.balance = SafeBigIntMath.subtract(from.data.balance, transactionFee)
-    } else {
-      transactionFee = from.data.balance
-      from.data.balance = BigInt(0)
-    }
-    from.timestamp = txTimestamp
-  }
+  // A rejected payment changes neither balances nor nonce. In particular, replaying
+  // an already committed payment must not charge its sender again.
+  const transactionFee = 0n
 
   const appReceiptData: AppReceiptData = {
+    networkId: tx.networkId,
     txId,
     timestamp: txTimestamp,
     success: false,
@@ -312,8 +326,10 @@ export const createRelevantAccount = (
   if (!account) {
     if (accountId === tx.chatId) {
       account = create.chatAccount(accountId, tx)
+    } else if (accountId === tx.to && accountId !== tx.from) {
+      account = create.userAccount(accountId, tx.timestamp)
     } else {
-      throw Error('Account must exist in order to send a message transaction')
+      throw Error('Sender account must exist to send a payment')
     }
     accountCreated = true
   }

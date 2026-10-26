@@ -4,6 +4,7 @@ import { ShardusTypes } from '@shardus/core'
 import { P2P } from '@shardus/lib-types'
 import { StakeCert } from '../transactions/staking/query_certificate'
 import { AdminCert } from '../transactions/admin_certificate'
+import type { ScoreValue } from '../config/score'
 
 // Define the AJVSchemaEnum with snake case values
 export enum AJVSchemaEnum {
@@ -24,6 +25,10 @@ export enum AJVSchemaEnum {
   register = 'register',
   create = 'create',
   transfer = 'transfer',
+  profile = 'profile',
+  contract = 'contract',
+  endorsement = 'endorsement',
+  skill = 'skill',
   message = 'message',
   read = 'read',
   reclaim_toll = 'reclaim_toll',
@@ -67,6 +72,10 @@ export enum TXTypes {
   register = 'register',
   create = 'create',
   transfer = 'transfer',
+  profile = 'profile',
+  contract = 'contract',
+  endorsement = 'endorsement',
+  skill = 'skill',
   message = 'message',
   read = 'read',
   reclaim_toll = 'reclaim_toll',
@@ -210,6 +219,7 @@ export namespace Tx {
   }
 
   export interface Transfer extends BaseWinTx {
+    nonce: number
     from: string
     to: string
     amount: bigint
@@ -414,6 +424,8 @@ export interface UserAccount {
   type: string
   data: {
     balance: bigint
+    /** Last consumed payment nonce; absent legacy wallets start at zero. */
+    transferNonce?: number
     toll: bigint | null
     tollUnit: TollUnit
     chats: chatMessages
@@ -751,14 +763,24 @@ export type AccountVariant =
   | DevAccount
   | DaoProposalsMeta
   | DaoProposalAccount
+  | ProofOfSkillAccount
 
 /**
  * ---------------------- NETWORK DATA export interfaceS ----------------------
  */
 
 export interface NetworkParameters {
+
   title: string
   description: string
+  maxSupply: bigint,
+  maxTransactionBytes: number,
+  maxParties: number,
+  maxSkills: number,
+  maxEvidence: number,
+  maxClockSkewMs: number,
+  contractApprovalWindowMs: number,
+  joinProofLifetimeMs: number,
   nodeRewardInterval: number
   maintenanceInterval: number
   maintenanceFee: bigint
@@ -933,6 +955,7 @@ export interface NodeRefutedViolationData {
 }
 
 export interface AppReceiptData {
+  networkId?: string
   txId: string
   timestamp: number
   success: boolean
@@ -952,3 +975,465 @@ export interface GoldenTicketRequest {
   port: number
   sign: Signature
 }
+
+
+export interface EditableObjectMetadata {
+  id: string
+  owner: string
+  managers: string[]
+  schemaVersion: 1
+  revision: number
+  createdAt: number
+  updatedAt: number
+}
+
+export type ContractWorkStatus = 'planned' | 'active' | 'completed' | 'canceled' | 'disputed'
+export type ContractApprovalStatus = 'not_requested' | 'pending' | 'approved' | 'rejected' | 'expired'
+
+export interface ContractContent {
+  origin: 'new' | 'historical'
+  title: string
+  publicDescription: string
+  // Published registry data is public; this field must contain ciphertext only.
+  encryptedDescription?: string
+  workerProfileId: string
+  hiringProfileIds: string[]
+  skillIds: string[]
+  terms: {
+    responsibilities: string[]
+    acceptanceCriteria: string[]
+    startDate: string
+    endDate?: string
+    durationMonths: number
+    workMode?: 'onsite' | 'remote' | 'hybrid'
+    location?: string
+  }
+  compensation?: {
+    amount: string
+    currency: string
+    frequency: 'once' | 'hourly' | 'monthly' | 'milestone'
+  }
+  workStatus: ContractWorkStatus
+  // Months are 1-based calendar anniversaries from terms.startDate.
+  periodOutcomes: { month: number; outcome: 'success' | 'failure' }[]
+  evidence: { id: string; description: string; url?: string; contentHash?: string }[]
+  cancellationReason?: string
+}
+
+export interface Contract extends EditableObjectMetadata, ContractContent {
+  createdBy: string
+  termsRevision: number
+  termsHash: string
+  approvalStatus: ContractApprovalStatus
+  approvalRequest?: {
+    id: string
+    hash: string
+    termsRevision: number
+    requestedAt: number
+    expiresAt: number
+    networkId: string
+    rulesVersion: number
+    // Authorities and scores are fixed when the worker requests approval.
+    authorities: Record<string, string[]>
+    scoreSnapshot: Record<string, ScoreValue>
+  }
+  approvals: { profileId: string; signer: string; requestHash: string; approvedAt: number; approvalTxId: string }[]
+  rejection?: { profileId: string; signer: string; rejectedAt: number; reason: string }
+  creditedMonths: number[]
+}
+
+export interface Endorsement extends EditableObjectMetadata {
+  id: string
+  createdAt: number
+  updatedAt: number
+
+  endorserProfileId: string
+  subjectProfileId: string
+  skillId: string
+
+  relationship:
+    | 'employer'
+    | 'colleague'
+    | 'client'
+    | 'teacher'
+    | 'mentor'
+    | 'collaborator'
+    | 'other'
+
+  statement: string
+  contractId?: string          // Optional supporting work contract
+
+  evidence: {
+    id: string
+    description: string
+    url?: string
+    contentHash?: string
+  }[]
+
+  durationMonths: number
+  validFrom: number
+  validUntil: number
+
+  status: 'active' | 'revoked' | 'expired'
+  revokedAt?: number
+  revocationReason?: string
+
+  scoring: number
+
+  schemaVersion: 1
+  revision: number
+}
+
+export interface ProfileLink {
+  label: string
+  url: string
+}
+
+export interface DateRange {
+  startDate: string       // YYYY or YYYY-MM
+  endDate?: string        // Omit while ongoing
+  current?: boolean
+}
+
+export type ProfileType =
+  | 'person'
+  | 'organization'
+  | 'government'
+  | 'company'
+  | 'university'
+  | 'school'
+
+export interface ProfileCommon extends EditableObjectMetadata {
+  displayName: string
+  summary?: string
+  avatarUrl?: string
+  coverImageUrl?: string
+  // Contact information
+  contact?: {
+    email?: string
+    phone?: string
+    website?: string
+    location?: {
+      city?: string
+      region?: string
+      countryCode?: string // ISO two-letter code, e.g. TN
+    }
+    links?: ProfileLink[]  // LinkedIn, GitHub, portfolio, etc.
+  }
+
+}
+
+export interface EntityDetails {
+  legalName: string
+  registrationNumber?: string
+  countryCode?: string
+  foundedOn?: string
+  website?: string
+}
+export interface OrganizationDetails extends EntityDetails {
+  organizationKind?: string
+  mission?: string
+}
+export interface CompanyDetails extends EntityDetails {
+  industry?: string
+  legalForm?: string
+  services?: string[]
+}
+export interface GovernmentDetails extends EntityDetails {
+  jurisdiction: string
+  level?: 'national' | 'regional' | 'local'
+  department?: string
+}
+export interface UniversityDetails extends EntityDetails {
+  accreditations?: string[]
+  faculties?: string[]
+  programs?: string[]
+}
+export interface SchoolDetails extends EntityDetails {
+  educationLevels?: string[]
+  accreditations?: string[]
+  curriculum?: string
+}
+export type Profile = ProfileCommon & (
+  | { type: 'person'; details: PersonDetails }
+  | { type: 'organization'; details: OrganizationDetails }
+  | { type: 'government'; details: GovernmentDetails }
+  | { type: 'company'; details: CompanyDetails }
+  | { type: 'university'; details: UniversityDetails }
+  | { type: 'school'; details: SchoolDetails }
+)
+
+export type ProfileContent = Pick<ProfileCommon, 'displayName' | 'summary' | 'avatarUrl' | 'coverImageUrl' | 'contact'> & (
+  | { type: 'person'; details: PersonDetails }
+  | { type: 'organization'; details: OrganizationDetails }
+  | { type: 'government'; details: GovernmentDetails }
+  | { type: 'company'; details: CompanyDetails }
+  | { type: 'university'; details: UniversityDetails }
+  | { type: 'school'; details: SchoolDetails }
+)
+
+export type SkillContent = Pick<Skill, 'name' | 'description' | 'category' | 'kind'>
+export type EndorsementContent = Pick<Endorsement, 'endorserProfileId' | 'subjectProfileId' | 'skillId' | 'relationship' | 'statement' | 'durationMonths'>
+
+export interface ProofOfSkillTx extends BaseWinTx {
+  type: TXTypes.profile | TXTypes.contract | TXTypes.endorsement | TXTypes.skill
+  from: string
+  to: string
+  objectId: string
+  expectedRevision: number
+  fee: bigint
+  action: 'create' | 'update' | 'request_approval' | 'approve' | 'reject' | 'expire' | 'revoke'
+  payload?: ProfileContent | ContractContent | EndorsementContent | SkillContent
+  requestHash?: string
+  hiringProfileId?: string
+  reason?: string
+}
+
+export interface PersonDetails {
+  firstName?: string
+  lastName?: string
+  headline?: string       // Example: "Full-stack developer"
+
+  // Skills claimed by the profile owner
+  skills?: {
+    skillId: string       // Reference to the protected skills account
+    yearsOfExperience?: number
+    selfAssessedLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert'
+    evidenceIds?: string[]
+  }[]
+
+  // Employment history
+  experience?: (DateRange & {
+    id: string
+    jobTitle: string
+    organization: string
+    organizationUrl?: string
+    employmentType?:
+      | 'full_time'
+      | 'part_time'
+      | 'contract'
+      | 'freelance'
+      | 'internship'
+      | 'apprenticeship'
+      | 'self_employed'
+    location?: string
+    workMode?: 'onsite' | 'remote' | 'hybrid'
+    description?: string
+    responsibilities?: string[]
+    achievements?: string[]
+    skillIds?: string[]
+    contractIds?: string[] // References to WIN contract records
+    links?: ProfileLink[]
+  })[]
+
+  // Education
+  education?: (DateRange & {
+    id: string
+    institution: string
+    institutionUrl?: string
+    qualification: string // Degree, diploma, etc.
+    fieldOfStudy?: string
+    location?: string
+    grade?: string
+    coursework?: string[]
+    thesisTitle?: string
+    honors?: string[]
+    description?: string
+    links?: ProfileLink[]
+  })[]
+
+  // Professional certifications and licenses
+  certifications?: {
+    id: string
+    name: string
+    issuer: string
+    issuedOn?: string
+    expiresOn?: string
+    doesNotExpire?: boolean
+    credentialId?: string
+    credentialUrl?: string
+    skillIds?: string[]
+  }[]
+
+  // Projects and portfolio
+  projects?: (DateRange & {
+    id: string
+    title: string
+    role?: string
+    organization?: string
+    description?: string
+    achievements?: string[]
+    skillIds?: string[]
+    contractIds?: string[]
+    links?: ProfileLink[]  // Demo, repository, case study, etc.
+  })[]
+
+  // Spoken and written languages
+  languages?: {
+    languageCode: string  // Example: ar, fr, en
+    proficiency:
+      | 'elementary'
+      | 'limited_working'
+      | 'professional_working'
+      | 'full_professional'
+      | 'native_or_bilingual'
+    cefrLevel?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
+    certificationId?: string
+  }[]
+
+  // Awards, honors, competitions, and scholarships
+  awards?: {
+    id: string
+    title: string
+    issuer: string
+    awardedOn?: string
+    description?: string
+    url?: string
+  }[]
+
+  // Articles, papers, books, and other publications
+  publications?: {
+    id: string
+    title: string
+    publisher?: string
+    publishedOn?: string
+    authors?: string[]
+    description?: string
+    doi?: string
+    url?: string
+  }[]
+
+  // Patents
+  patents?: {
+    id: string
+    title: string
+    patentNumber?: string
+    patentOffice?: string
+    status?: 'pending' | 'granted' | 'expired'
+    filedOn?: string
+    grantedOn?: string
+    inventors?: string[]
+    description?: string
+    url?: string
+  }[]
+
+  // Courses and professional development
+  courses?: {
+    id: string
+    title: string
+    provider: string
+    completedOn?: string
+    durationHours?: number
+    certificateUrl?: string
+    skillIds?: string[]
+  }[]
+
+  // Volunteering and community involvement
+  volunteering?: (DateRange & {
+    id: string
+    organization: string
+    role: string
+    cause?: string
+    description?: string
+    achievements?: string[]
+    links?: ProfileLink[]
+  })[]
+
+  // Professional associations
+  memberships?: (DateRange & {
+    id: string
+    organization: string
+    role?: string
+    description?: string
+    url?: string
+  })[]
+
+  // Conferences, presentations, and workshops
+  speaking?: {
+    id: string
+    title: string
+    event: string
+    date?: string
+    location?: string
+    description?: string
+    links?: ProfileLink[]
+  }[]
+
+  interests?: string[]
+  referencesAvailableOnRequest?: boolean
+
+  // Optional job-search preferences
+  preferences?: {
+    openToWork?: boolean
+    desiredRoles?: string[]
+    employmentTypes?: string[]
+    workModes?: ('onsite' | 'remote' | 'hybrid')[]
+    preferredLocations?: string[]
+    willingToRelocate?: boolean
+    availableFrom?: string
+    noticePeriodDays?: number
+  }
+}
+
+
+export interface Skill extends EditableObjectMetadata {
+  id: string
+  name: string
+  description: string
+
+  category: string             // Example: "Software development"
+  kind: 'technical' | 'interpersonal' | 'language' | 'other'
+
+  aliases: string[]
+  relatedSkillIds: string[]
+
+  // Criteria for demonstrating this skill.
+  assessmentCriteria: {
+    id: string
+    description: string
+  }[]
+  createdAt: number
+  updatedAt: number
+  schemaVersion: 1
+  revision: number
+}
+
+export interface RegistryAccountBase {
+  id: string
+  hash: string
+  timestamp: number
+  schemaVersion: 1
+  revision: number
+}
+
+export interface ProfilesAccount extends RegistryAccountBase {
+  type: 'ProfilesAccount'
+  profiles: Record<string, Profile>
+}
+
+export interface ContractsAccount extends RegistryAccountBase {
+  type: 'ContractsAccount'
+  contracts: Record<string, Contract>
+}
+
+export interface EndorsementsAccount extends RegistryAccountBase {
+  type: 'EndorsementsAccount'
+  endorsements: Record<string, Endorsement>
+}
+
+export interface ScoresAccount extends RegistryAccountBase {
+  type: 'ScoresAccount'
+  scores: Record<string, ScoreValue>
+}
+
+export interface SkillsAccount extends RegistryAccountBase {
+  type: 'SkillsAccount'
+  skills: Record<string, Skill>
+}
+
+export type ProofOfSkillAccount =
+  | ProfilesAccount
+  | ContractsAccount
+  | EndorsementsAccount
+  | ScoresAccount
+  | SkillsAccount

@@ -10,11 +10,53 @@ import { wintoWei } from '../utils/units'
 
 export const networkAccount = '0'.repeat(64)
 
-export const profilesAddress = '1'+'0'.repeat(63)
-export const skillsAddress = '2'+'0'.repeat(63)
-export const contractsAddress = '3'+'0'.repeat(63)
-export const endorsmentsAddress = '4'+'0'.repeat(63)
-export const scoresAddress = '5'+'0'.repeat(63)
+// Application signing domain for this new WIN deployment (distinct from Shardus cycle IDs).
+const deploymentNetworkId = 'f4ad1838b012fe4af28cfbcc01c30044e3e225ef6be7e8461343d1de369949d9'
+export const IS_LOCAL_TEST = process.env.WIN_LOCAL_TEST === '1'
+if (IS_LOCAL_TEST && (!/^[a-f0-9]{64}$/.test(process.env.WIN_LOCAL_NETWORK_ID || '') || process.env.WIN_LOCAL_NETWORK_ID === deploymentNetworkId)) {
+  throw new Error('Local tests require a separate 64-character WIN_LOCAL_NETWORK_ID')
+}
+if (IS_LOCAL_TEST && process.env.WIN_LOCAL_ARCHIVER_VERSION !== '1.0.0') {
+  throw new Error('The local launcher currently supports the pinned WIN archiver 1.0.0')
+}
+if (IS_LOCAL_TEST && !/^[a-f0-9]{64}$/.test(process.env.WIN_LOCAL_AUTHORITY_PUBLIC_KEY || '')) {
+  throw new Error('Local tests require a generated WIN_LOCAL_AUTHORITY_PUBLIC_KEY')
+}
+export const WIN_NETWORK_ID = IS_LOCAL_TEST ? process.env.WIN_LOCAL_NETWORK_ID : deploymentNetworkId
+
+export const profilesAddress = '1' + '0'.repeat(63)
+export const contractsAddress = '2' + '0'.repeat(63)
+export const endorsementsAddress = '3' + '0'.repeat(63)
+export const scoresAddress = '4' + '0'.repeat(63)
+export const skillsAddress = '5' + '0'.repeat(63)
+
+export const proofOfSkillAddresses = Object.freeze({
+  profiles: profilesAddress,
+  contracts: contractsAddress,
+  endorsements: endorsementsAddress,
+  scores: scoresAddress,
+  skills: skillsAddress,
+})
+
+const protectedAddressSet = new Set<string>(
+  Object.values(proofOfSkillAddresses)
+)
+
+export function isProtectedAddress(address: string): boolean {
+  return protectedAddressSet.has(address)
+}
+
+export function assertNoProtectedAddresses(
+  addresses: readonly string[]
+): void {
+  for (const address of addresses) {
+    if (isProtectedAddress(address)) {
+      throw new Error(
+        `Transaction cannot use protected account ${address}`
+      )
+    }
+  }
+}
 
 // HELPFUL TIME CONSTANTS IN MILLISECONDS
 export const ONE_SECOND = 1000
@@ -36,8 +78,17 @@ const reduceTimeFromTxTimestamp = cycleDuration * ONE_SECOND
 
 // INITIAL NETWORK PARAMETERS FOR WIN
 export const INITIAL_PARAMETERS: NetworkParameters = {
+
   title: 'Initial parameters',
   description: 'These are the initial network parameters win started with',
+  maxSupply: 1_000_000_000n * 10n ** 18n,
+  maxTransactionBytes: 100_000_000,
+  maxParties: 250,
+  maxSkills: 50,
+  maxEvidence: 8,
+  maxClockSkewMs: 60_000,
+  contractApprovalWindowMs: 60 * 60_000,
+  joinProofLifetimeMs: 5 * 60_000,
   nodeRewardInterval: ONE_HOUR, //ONE_HOUR,
   maintenanceInterval: ONE_DAY,
   maintenanceFee: wintoWei(0),
@@ -48,9 +99,9 @@ export const INITIAL_PARAMETERS: NetworkParameters = {
   activeVersion: '2.5.2',
   latestVersion: '2.5.2',
   archiver: {
-    minVersion: '3.8.3',
-    activeVersion: '3.8.3',
-    latestVersion: '3.8.3',
+    minVersion: IS_LOCAL_TEST ? '1.0.0' : '3.8.3',
+    activeVersion: IS_LOCAL_TEST ? '1.0.0' : '3.8.3',
+    latestVersion: IS_LOCAL_TEST ? '1.0.0' : '3.8.3',
   },
   stabilityScaleMul: 125,
   stabilityScaleDiv: 1,
@@ -702,5 +753,26 @@ config = merge(
   },
   { arrayMerge: overwriteMerge },
 )
+
+if (IS_LOCAL_TEST) {
+  // Local formation/restarts do not require funded staking wallets or a ticket service.
+  WinFlags.StakingEnabled = false
+  WinFlags.AdminCertEnabled = false
+  WinFlags.VerboseLogs = false
+  const localArchivers = config.server.p2p.existingArchivers
+  if (!localArchivers?.length || localArchivers.some(a => a.ip !== '127.0.0.1')) {
+    throw new Error('Local tests require explicitly configured loopback archivers')
+  }
+  config = merge(config, {
+    server: {
+      ip: { externalIp: '127.0.0.1', internalIp: '127.0.0.1' },
+      p2p: { minNodes: 10, baselineNodes: 10, maxNodes: 10, maxRotatedPerCycle: 0, extraNodesToAddInRestart: 0 },
+      reporting: { recipient: 'http://127.0.0.1:3000/api' },
+    },
+  })
+  const localAuthority = { [process.env.WIN_LOCAL_AUTHORITY_PUBLIC_KEY]: DevSecurityLevel.High }
+  config.server.debug.devPublicKeys = localAuthority
+  config.server.debug.multisigKeys = localAuthority
+}
 
 export default config

@@ -9,12 +9,10 @@ import { Shardus } from '@shardus/core'
 export const networkAccount = (accountId: string, timestamp: number, dapp: Shardus): NetworkAccount => {
   // Ensure lowercase accountId
   accountId = accountId.toLowerCase()
-  const latestCycles = dapp.getLatestCycles()
-  const currentCycle = latestCycles[0]
 
   const account: NetworkAccount = {
     id: accountId,
-    networkId: currentCycle.networkId,
+    networkId: config.WIN_NETWORK_ID,
     type: 'NetworkAccount',
     listOfChanges: [],
     current: config.INITIAL_PARAMETERS,

@@ -27,6 +27,42 @@ each interval.
 }
 ```
 
+### GET /bridge/status
+
+Read-only diagnostics for the selected Liberdus-style reserve bridge. The native
+side will use transfers from/to a TSS-controlled wallet; the existing BSC WIN
+token needs a separate lock/release vault because it has no bridge mint/burn API.
+
+Public configuration lives in `src/config/bridge.json`, under a WIN application
+network ID in `deployments`. Each entry contains `tssAddress`, `vaultAddress`,
+`reserveCapWin` (exact decimal text or null), and `observerUrls`. Unknown fields,
+protected custody addresses, inexact amounts and credential-bearing observer URLs
+are rejected. The native reserve address is derived from the TSS EVM address by
+removing `0x`, lowercasing, and appending 24 zeroes. Do not put private keys or TSS
+shares in this file.
+
+The current local test network has `reserveCapWin: "100"`. This is a maximum
+reserve balance, **not** an initial allocation or a request to send 100 WIN in one
+transaction. Other network IDs do not inherit this setting. Editing configuration
+never funds an account or restores deleted genesis allocations.
+
+The response includes `model`, `networkId`, `referenceToken`, public addresses,
+`reserveCapAtomic`, actual `reserve.balanceAtomic`, `reserve.transferNonce`,
+`reserve.withinConfiguredCap`, `missing`, and `pendingImplementation`. A missing
+reserve returns `accountExists: false` and a null balance; an existing unfunded
+wallet returns balance `"0"`. Amounts are decimal strings in 18-decimal atomic units.
+The endpoint returns 503 for an unavailable/mismatched network or an unsuitable
+reserve account. Reads do not alter the ledger.
+
+This step exposes configuration and diagnostics only. `enabled`, `operational`,
+`reserveCapEnforced` and `allocationAppliedByConfiguration` remain false, even if
+addresses are filled in or the reserve is funded. Funding, cap enforcement, vault
+integration, observers, shared signing and durable cross-chain event replay
+protection remain implementation steps. `referenceToken` identifies the intended
+BSC mainnet asset; it does not connect this local test network to real funds.
+Compile and perform a coordinated server restart before querying a newly added
+endpoint on a running deployment.
+
 ## Account Endpoints
 
 ### GET /account/:id
@@ -154,7 +190,7 @@ Network Management:
 
 Account Management:
 - `register`: Register new account
-- `create`: Create account
+- `create`: Disabled unrestricted mint transaction
 - `transfer`: Transfer between accounts
 
 Messaging and Social:
@@ -257,57 +293,138 @@ Requirements:
 - Signature must be cryptographically valid
 
 #### `create`
-Creates or adds tokens to an account.
 
-**Transaction Parameters:**
-```json
-{
-  "type": "create",
-  "from": string,    // Source account ID
-  "to": string,      // Target account ID
-  "amount": bigint,  // Amount to create (must be > 0)
-  "timestamp": number
-}
-```
-
-Requirements:
-- Amount must be greater than 0
-- Target account must exist
-- Amount must be specified as a BigInt
+Disabled in the WIN application network. Public transactions cannot mint tokens.
+Ordinary wallet creation starts with zero WIN. Preset genesis wallet allocations
+and their startup loader have been removed; existing ledger state is not erased.
+Governance issuance remains a separate policy requiring review before using
+externally backed tokens. Importing a profile or contract never funds a wallet.
 
 #### `transfer`
-Transfers tokens between accounts.
 
-**Transaction Parameters:**
-```json
+Transfers atomic WIN between ordinary wallets. Use the existing signed transaction
+format and `Utils.safeStringify` BigInt encoding; JSON numbers must not carry amounts.
+
+Required fields: `type: "transfer"`, `from`, `to`, `amount: bigint`, `fee: bigint`,
+`nonce`, `chatId`, `timestamp`, `networkId`, and `sign`. The signature covers all of
+these fields. `chatId` uses the existing deterministic sender/recipient calculation.
+
+- `amount` must be positive. One WIN is `10^18` atomic units.
+- The fixed transfer fee is `100000000000000000` atomic units (0.1 WIN), matching
+  `src/config/formulas.ts`. `/network/parameters` exposes the exact fee and network ID
+  in `protocol`; other transaction types retain their own fee rules.
+- `nonce` is a positive safe integer equal to `sender.data.transferNonce + 1`.
+  Legacy accounts without that field begin at zero. Successful payments consume it
+  atomically; rejected payments change neither balances nor nonce and charge no fee.
+- A missing recipient can be initialized at zero by the server; the sender must exist.
+  Public/private account compatibility and existing memo-toll rules still apply.
+- No payment key, including sender, recipient or chat ID, may use a protected registry.
+- `deductTxFeeFromAmount: true`, when enabled, makes the recipient receive
+  `amount - fee`; otherwise the sender pays the fee on top of the amount.
+- Required sender balance includes any applicable maintenance amount.
+
+A successful `/inject` response means submitted, not confirmed. Only a committed
+receipt matching `txId`, `networkId`, `type: "transfer"`, and `success: true` confirms
+the payment. Missing receipts, response loss, and timeouts remain unknown. Keep the
+signed transaction and nonce; do not automatically issue a second payment. A failed
+committed receipt or a definitive submission rejection is a failure.
+
+## WIN profiles and contract records
+
+The five fixed native accounts contain maps of current records: profiles at `1`
+followed by 63 zeroes, contracts at `2`, endorsements at `3`, scores at `4`, and skills
+at `5`. Internal addresses have no `0x` prefix. Only the matching typed handlers can
+access these registries. There is no general client-writable score transaction.
+
+Submit new `profile` and `contract` transactions to `/inject` using the existing
+stringified signed envelope. The common fields are:
+
+```ts
 {
-  "type": "transfer",
-  "from": string,    // Source account ID
-  "to": string,      // Target account ID
-  "amount": bigint,  // Amount to transfer (must be > 0)
-  "deductTxFeeFromAmount": boolean, // Optional, defaults to false. Supported from version 2.4.9.
-  "timestamp": number,
-  "sign": {
-    "owner": string  // Must match 'from' field
-  }
+  type: 'profile' | 'contract',
+  action: 'create' | 'update' | 'request_approval' | 'approve' | 'reject' | 'expire',
+  from: walletAddress,
+  to: registryAddress,
+  objectId: stable64CharacterHexId,
+  expectedRevision: 0, // creation: zero; later actions: current record revision
+  payload: content,   // create/update only
+  fee: atomicBigInt,
+  timestamp: currentTimestamp,
+  networkId: winApplicationNetworkId,
+  sign: { owner: walletAddress, sig: signature }
 }
 ```
 
-Requirements:
-- Both source and target accounts must exist
-- Amount must be greater than 0
-- Source account must have sufficient balance to cover:
-  - Transfer amount
-  - Transaction fee, unless `deductTxFeeFromAmount` is `true`
-- If `deductTxFeeFromAmount` is `true`, the transfer amount must be greater than the transaction fee
-- Must be signed by the source account
-- Signature must be cryptographically valid
+Strict, mandatory schemas in `src/domain/schema.ts` reject unexpected fields even
+when legacy AJV validation is disabled. IDs are chosen once and retained on updates.
+The server controls owner, managers, schemaVersion, revisions, createdAt and updatedAt.
+Current manager lists begin empty; there is no manager-administration action yet.
+Updates replace one map entry, preserving other objects. A revision conflict must be
+resolved by reading the current record. Normal transaction receipts and core recovery
+history are not deleted by this latest-record policy.
 
-The transaction will:
-1. Deduct amount from source account
-2. Add amount to target account, minus transaction fee when `deductTxFeeFromAmount` is `true`
-3. Deduct transaction fee from source account when `deductTxFeeFromAmount` is false or omitted
-4. Update timestamps for both accounts
+Profile actions are `create` and `update`. Common content is displayName, optional
+summary/avatarUrl/coverImageUrl/contact, type, and details. Types are person,
+organization, government, company, university, and school. Type cannot change after
+creation. Person details retain the complete CV fields in `PersonDetails`. Entity
+details require legalName; government also requires jurisdiction. A profile creates
+its initial scalar score (1,000,000 integer millionths), but creates no WIN balance.
+Large scalar scores use exact decimal strings, following the attached formula helper.
+
+Profile fees are the metadata formula (0.01 WIN + 0.001 WIN per started KiB of the
+canonical unsigned envelope, excluding fee and sign). Contract actions cost 1 WIN.
+The sender must already have a funded ordinary wallet. Failed object operations
+change no records or balances.
+
+Contract content is defined by `ContractContent` in `src/@types/index.ts`:
+origin, title, publicDescription, optional encryptedDescription, workerProfileId,
+hiringProfileIds, skillIds, terms, optional compensation, workStatus, periodOutcomes,
+evidence, and optional cancellationReason. All registry data is published; do not
+put unencrypted confidential descriptions in it. Referenced profiles and skills must
+exist. An empty skillIds list is allowed until skills are registered.
+
+Work status is planned, active, completed, canceled, or disputed. Approval status is
+separate: not_requested, pending, approved, rejected, or expired. Work dates are
+strict YYYY-MM-DD dates. Period outcomes contain unique 1-based calendar months and
+success/failure outcomes. Claimed periods must have finished by the current consensus
+time and any contract end date. Completed contracts describe every duration month;
+canceled contracts may describe only the periods actually worked.
+
+Historical creation stores original dates with a current transaction timestamp and
+approvalStatus not_requested. Compensation is descriptive: neither creation nor
+approval pays salaries, creates escrow, or awards unapproved score. The worker's
+profile controller creates the record; ownership is checked on later edits.
+
+`request_approval` is authorized by the contract controller and current worker
+controller. It creates a commitment binding network/rules, contract ID, exact terms
+hash/revision (including work status and outcomes), parties, hiring authorities,
+request ID, expiry, and score snapshots. A hash alone is not an approval.
+
+`approve` and `reject` include `requestHash` and `hiringProfileId`; reject also includes
+reason. The transaction signer must be both an authority captured in the request
+and a current controller of that hiring profile. A worker cannot approve its own
+relationship. Every hiring profile must approve. Record revision changes do not
+change the terms revision or request hash during collection of approvals.
+
+The final approval applies eligible monthly formula deltas atomically to the score
+registry using the fixed request snapshots. Successful periods add deltas; failed
+periods subtract them, with formula clamping. Planned/disputed work receives no new
+credit. Credited month counters reject repeated credit. There are no salary effects.
+
+Edits to uncredited contracts invalidate previous requests and approvals. Contracts
+that have already credited periods currently reject edits: retroactive score
+correction and ongoing monthly extension require a separate protocol. This avoids
+silently rewriting evidence for already-awarded score.
+
+Late approvals fail. Anyone may submit `expire` after a pending request expires;
+the owner can also start a new request after expiry or rejection. Read endpoints are
+`GET /profiles/:id`, `/contracts/:id`, and `/scores/:id`, returning `record` and
+`registryRevision`. Contract reads also return effectiveApprovalStatus without
+mutating stored state. A missing record returns 404, and unavailable state returns 503.
+
+Each object transaction is capped at 256 KiB and each registry draft at 4 MiB. These
+bounds keep the current five-account architecture within finite resource limits;
+raising capacity requires a coordinated protocol/resource-limit change.
 
 ## Messaging and Social Transactions
 

@@ -1,3 +1,5 @@
+import { proofOfSkillRecord, proofOfSkillDirectory } from './proofOfSkill'
+import { bridgeStatus } from './bridge'
 import { inject } from './inject'
 import network from './network'
 import accounts from './accounts'
@@ -11,8 +13,16 @@ import dao from './dao'
 import { Shardus } from '@shardus/core'
 export default (dapp: Shardus): void => {
   dapp.registerExternalPost('inject', inject(dapp))
+  dapp.registerExternalGet('profiles/:id', proofOfSkillRecord(dapp, 'profiles'))
+  dapp.registerExternalGet('contracts/:id', proofOfSkillRecord(dapp, 'contracts'))
+  dapp.registerExternalGet('scores/:id', proofOfSkillRecord(dapp, 'scores'))
+  for (const kind of ['profiles', 'contracts', 'skills', 'endorsements'] as const) {
+    if (kind === 'skills' || kind === 'endorsements') dapp.registerExternalGet(`${kind}/:id`, proofOfSkillRecord(dapp, kind))
+    dapp.registerExternalGet(kind, proofOfSkillDirectory(dapp, kind))
+  }
 
   dapp.registerExternalGet('network/parameters', network.current(dapp))
+  dapp.registerExternalGet('bridge/status', bridgeStatus(dapp))
 
   // New DAO API routes — Shardus applies registerExternalGet routes in LIFO order
   // (last registered = first matched in Express), so register specific paths last.

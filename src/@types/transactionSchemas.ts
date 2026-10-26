@@ -1,3 +1,4 @@
+import { proofOfSkillSchema } from '../domain/schema'
 import { addSchema } from './schemaHelper'
 import { ViolationType, AJVSchemaEnum, Signature, TXTypes } from './index'
 import * as Transactions from '../transactions'
@@ -93,6 +94,9 @@ export const schemaTransferTX = {
   type: 'object',
   properties: {
     ...baseTxProperties,
+    networkId: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+    nonce: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
+    xmemo: { type: 'object' },
     from: { type: 'string' },
     to: { type: 'string', minLength: 64, maxLength: 64 },
     amount: { isBigInt: true },
@@ -101,7 +105,7 @@ export const schemaTransferTX = {
     fee: { isBigInt: true },
     deductTxFeeFromAmount: { type: 'boolean' },
   },
-  required: [...baseTxRequired, 'from', 'to', 'amount', 'chatId'],
+  required: [...baseTxRequired, 'from', 'to', 'amount', 'chatId', 'networkId', 'nonce', 'fee'],
   additionalProperties: false,
 }
 
@@ -600,6 +604,10 @@ function addSchemas(): void {
   addSchema(AJVSchemaEnum.node_refuted_violation_data, schemaNodeRefutedViolationData)
   // Create a mapping of TXTypes to schema objects
   const txSchemaMap = {
+    [TXTypes.profile]: proofOfSkillSchema,
+    [TXTypes.contract]: proofOfSkillSchema,
+    [TXTypes.endorsement]: proofOfSkillSchema,
+    [TXTypes.skill]: proofOfSkillSchema,
     [TXTypes.transfer]: schemaTransferTX,
     [TXTypes.create]: schemaCreateTX,
     [TXTypes.init_network]: schemaInitNetworkTX,

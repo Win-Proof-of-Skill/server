@@ -6,6 +6,11 @@ import { deserializeNetworkAccount, networkAccount, serializeNetworkAccount } fr
 import { deserializeNodeAccount, nodeAccount, serializeNodeAccount } from './nodeAccount'
 import { daoProposalsMetaAccount, deserializeDaoProposalsMetaAccount, serializeDaoProposalsMetaAccount } from './daoProposalsMetaAccount'
 import { daoProposalAccount, deserializeDaoProposalAccount, serializeDaoProposalAccount } from './daoProposalAccount'
+import { profilesAccount } from './profile'
+import { contractsAccount } from './contract'
+import { endorsementsAccount } from './endorsement'
+import { scoresAccount } from './score'
+import { skillsAccount } from './skill'
 import { VectorBufferStream } from '@shardus/core'
 import {
   AccountVariant,
@@ -108,6 +113,11 @@ export const fallbackDeserializer = (stream: VectorBufferStream, root = false): 
 }
 
 export default {
+  profilesAccount,
+  contractsAccount,
+  endorsementsAccount,
+  scoresAccount,
+  skillsAccount,
   aliasAccount,
   devAccount,
   chatAccount,

@@ -1,3 +1,4 @@
+import { WIN_NETWORK_ID } from '../config'
 import {
   BaseWinTx,
   InjectTxResponse,
@@ -307,7 +308,7 @@ export function isValidNetworkId(tx: BaseWinTx, dapp: Shardus): boolean {
   if (cycleRecords.length === 0) {
     return false
   }
-  return tx.networkId === cycleRecords[0].networkId // check if the networkId matches the expected one
+  return tx.networkId === WIN_NETWORK_ID // application signing domain; cycle IDs belong to core
 }
 
 export function isValidDevKeyAddition(givenConfig: any): boolean {
