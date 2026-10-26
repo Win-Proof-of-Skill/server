@@ -1,3 +1,4 @@
+import * as bridge from './bridge'
 import * as proofOfSkill from './proofOfSkill'
 import * as init_network from './init_network'
 import * as register from './register'
@@ -39,6 +40,9 @@ import * as dao_project_end from './dao/dao_project_end'
 import * as dao_project_reclaim_balance from './dao/dao_project_reclaim_balance'
 
 export default {
+  bridge_deposit: bridge,
+  bridge_withdraw: bridge,
+  bridge_fund: bridge,
   profile: proofOfSkill,
   contract: proofOfSkill,
   endorsement: proofOfSkill,

@@ -222,7 +222,7 @@ test('handler validation does not mutate state, and applying a profile only char
   transaction.fee = handler.proofOfSkillFee(transaction)
   const wallet = userAccount(sender, now)
   wallet.data.balance = 10n ** 18n
-  const accounts = [wallet, state.profiles, state.scores]
+  const accounts = [userAccount(formulas.feeRecipient, now), wallet, state.profiles, state.scores]
   const wrapped = Object.fromEntries(accounts.map((data) => [data.id, { data, accountId: data.id, timestamp: data.timestamp, stateId: data.hash }]))
   const previous = Utils.safeStringify(wrapped)
   const signature = jest.spyOn(crypto, 'verifyObj').mockReturnValue(true)
@@ -236,6 +236,7 @@ test('handler validation does not mutate state, and applying a profile only char
     expect(Utils.safeStringify(wrapped)).toBe(previous)
     handler.apply(transaction, now, id(501), wrapped, dapp, {})
     expect(wallet.data.balance).toBe(10n ** 18n - transaction.fee)
+    expect(wrapped[formulas.feeRecipient].data.data.balance).toBe(transaction.fee)
     expect(wrapped[profilesAddress].data.profiles[id(10)]).toMatchObject({ owner: sender, revision: 1, createdAt: now })
     expect(wrapped[scoresAddress].data.scores[id(10)]).toBe(formulas.initialScore)
     const after = Utils.safeStringify(wrapped)
@@ -261,12 +262,13 @@ test('handler approval atomically changes the contract and score registries and 
   const wallet = userAccount(employer, now)
   wallet.data.balance = 3n * formulas.contractFee
   const wrapped = Object.fromEntries(
-    [wallet, ...Object.values(state)].map((data) => [data.id, { data, accountId: data.id, timestamp: data.timestamp, stateId: data.hash }]),
+    [userAccount(formulas.feeRecipient, now), wallet, ...Object.values(state)].map((data) => [data.id, { data, accountId: data.id, timestamp: data.timestamp, stateId: data.hash }]),
   )
   const signature = jest.spyOn(crypto, 'verifyObj').mockReturnValue(true)
   try {
     handler.apply(transaction, now + 100, id(503), wrapped, { applyResponseAddReceiptData() {} }, {})
     expect(wallet.data.balance).toBe(2n * formulas.contractFee)
+    expect(wrapped[formulas.feeRecipient].data.data.balance).toBe(formulas.contractFee)
     expect(wrapped[contractsAddress].data.contracts[id(3)]).toMatchObject({ approvalStatus: 'approved', creditedMonths: [1, 2] })
     expect(wrapped[contractsAddress].data.timestamp).toBe(now + 100)
     expect(wrapped[scoresAddress].data.timestamp).toBe(now + 100)

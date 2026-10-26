@@ -1,5 +1,5 @@
 import * as crypto from '../crypto'
-import { formulas } from '../config/formulas'
+import { formulas, transferFee } from '../config/formulas'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import * as utils from '../utils'
 import * as config from '../config'
@@ -26,8 +26,12 @@ export const validate_fields = (tx: Tx.Transfer, response: ShardusTypes.Incoming
     response.reason = 'Payment nonce must be a positive safe integer'
     return response
   }
-  if (typeof tx.fee !== 'bigint' || tx.fee !== formulas.transferFee) {
-    response.reason = `Payment fee must be exactly ${formulas.transferFee} atomic WIN`
+  if (typeof tx.amount !== 'bigint' || tx.amount <= 0n) {
+    response.reason = 'Transfer amount must be positive atomic WIN'
+    return response
+  }
+  if (typeof tx.fee !== 'bigint' || tx.fee !== transferFee(tx.amount)) {
+    response.reason = `Payment fee must be exactly ${transferFee(tx.amount)} atomic WIN`
     return response
   }
   if (typeof tx.amount !== 'bigint' || tx.amount <= BigInt(0)) {
@@ -56,7 +60,7 @@ export const validate_fields = (tx: Tx.Transfer, response: ShardusTypes.Incoming
       return response
     }
     if (tx.deductTxFeeFromAmount === true) {
-      const transactionFee = formulas.transferFee
+      const transactionFee = transferFee(tx.amount)
       if (tx.amount <= transactionFee) {
         response.reason = 'transfer amount must be greater than the transaction fee when deductTxFeeFromAmount is true'
         return response
@@ -112,6 +116,11 @@ export const validate = (
     return response
   }
 
+  const collector = wrappedStates[formulas.feeRecipient]?.data as UserAccount
+  if (!isUserAccount(collector) || collector.id !== formulas.feeRecipient || typeof collector.data.balance !== 'bigint') {
+    response.reason = 'Invalid native WIN fee account'
+    return response
+  }
   const fromPrivate = from.private || false
   const toPrivate = to.private || false
 
@@ -120,7 +129,7 @@ export const validate = (
     return response
   }
 
-  const transactionFee = formulas.transferFee
+  const transactionFee = transferFee(tx.amount)
   const deductTxFeeFromAmount =
     config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
     tx.deductTxFeeFromAmount === true
@@ -177,7 +186,7 @@ export const validate = (
     }
   }
   if (network) {
-    if (formulas.transferFee > tx.fee) {
+    if (transferFee(tx.amount) !== tx.fee) {
       response.success = false
       response.reason = `The network transaction fee (${utils.getTransactionFeeWei(
         AccountsStorage.cachedNetworkAccount,
@@ -208,7 +217,7 @@ export const apply = (
   from.data.transferNonce = tx.nonce
 
   // update balances
-  const transactionFee = formulas.transferFee
+  const transactionFee = transferFee(tx.amount)
   const maintenanceFee = utils.maintenanceAmount(txTimestamp, from, network)
   const deductTxFeeFromAmount =
     config.WinFlags.versionFlags.supportDeductTxFeeFromAmount === true &&
@@ -223,6 +232,9 @@ export const apply = (
     amountReceived = SafeBigIntMath.subtract(tx.amount, transactionFee)
   }
   to.data.balance = SafeBigIntMath.add(to.data.balance, amountReceived)
+  const collector = wrappedStates[formulas.feeRecipient].data as UserAccount
+  collector.data.balance += transactionFee
+  collector.timestamp = txTimestamp
 
   // store transfer data in chat
   if (!from.data.chats[tx.to]) {
@@ -301,14 +313,14 @@ export const createFailedAppReceiptData = (
 
 export const keys = (tx: Tx.Transfer, result: ShardusTypes.TransactionKeys): ShardusTypes.TransactionKeys => {
   result.sourceKeys = [tx.chatId, tx.from]
-  result.targetKeys = [tx.to]
+  result.targetKeys = [...new Set([tx.to, formulas.feeRecipient])].filter(id => !result.sourceKeys.includes(id))
   result.allKeys = [...result.sourceKeys, ...result.targetKeys]
   return result
 }
 
 export const memoryPattern = (tx: Tx.Transfer, result: ShardusTypes.TransactionKeys): ShardusTypes.ShardusMemoryPatternsInput => {
   const memoryPattern: ShardusTypes.ShardusMemoryPatternsInput = {
-    rw: [tx.from, tx.to, tx.chatId],
+    rw: [...new Set([tx.from, tx.to, tx.chatId, formulas.feeRecipient])],
     wo: [],
     on: [],
     ri: [],
@@ -326,7 +338,7 @@ export const createRelevantAccount = (
   if (!account) {
     if (accountId === tx.chatId) {
       account = create.chatAccount(accountId, tx)
-    } else if (accountId === tx.to && accountId !== tx.from) {
+    } else if ((accountId === tx.to || accountId === formulas.feeRecipient) && accountId !== tx.from) {
       account = create.userAccount(accountId, tx.timestamp)
     } else {
       throw Error('Sender account must exist to send a payment')

@@ -40,7 +40,7 @@ export const proofOfSkillAddresses = Object.freeze({
 })
 
 const protectedAddressSet = new Set<string>(
-  Object.values(proofOfSkillAddresses)
+  [...Object.values(proofOfSkillAddresses), '6' + '0'.repeat(63)]
 )
 
 export function isProtectedAddress(address: string): boolean {

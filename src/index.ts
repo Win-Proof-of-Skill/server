@@ -835,7 +835,7 @@ const shardusSetup = (): void => {
       return false
     },
     async txPreCrackData(tx: any, appData: any): Promise<{ status: boolean; reason: string }> {
-      if (isProofOfSkillTransaction(tx.type)) {
+      if (isProofOfSkillTransaction(tx.type) || ['bridge_deposit', 'bridge_withdraw', 'bridge_fund', 'transfer'].includes(tx.type)) {
         const fields = this.validate({ tx }, appData)
         if (!fields.success) return { status: false, reason: fields.reason }
         try {

@@ -11,7 +11,8 @@ export const formulas = Object.freeze({
   initialScore: 1_000_000,
   minimumScore: 1_000_000,
   minimumValidatorScore: 100_000_000,
-  transferFee: winScale / 10n,
+  transferFeeBps: 50,
+  feeRecipient: '9fe734826be44b76f06d1d3262130dce45076a3c000000000000000000000000',
   contractFee: winScale ,
   extractionFee: winScale / 10n,
   endorsementFee: winScale / 2n,
@@ -54,10 +55,10 @@ export function contractMonthlyDeltas(employeeScore: ScoreValue | bigint, hireSc
 export function endorsementDelta(sourceScore: ScoreValue | bigint, targetScore: ScoreValue | bigint, months: number): bigint {
   return boundedDelta(checkedMonths(months) * checkedScore(sourceScore) * BigInt(formulas.scoreScale) / (checkedScore(targetScore) * 1200n));
 }
-/** Fixed 0.1 WIN, charged on top of the transfer amount. */
+/** 0.5%, rounded up to one atomic WIN, charged separately. */
 export function transferFee(amount: bigint): bigint {
   if (amount <= 0n) throw new Error('Transfer amount must be positive');
-  return formulas.transferFee;
+  return (amount * BigInt(formulas.transferFeeBps) + 9999n) / 10000n;
 }
 /** Original metadata/validator fee retained where no replacement fee was requested. */
 export const transactionFee = (bytes: number): bigint => {

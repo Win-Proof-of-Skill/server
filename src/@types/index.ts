@@ -25,6 +25,9 @@ export enum AJVSchemaEnum {
   register = 'register',
   create = 'create',
   transfer = 'transfer',
+  bridge_deposit = 'bridge_deposit',
+  bridge_withdraw = 'bridge_withdraw',
+  bridge_fund = 'bridge_fund',
   profile = 'profile',
   contract = 'contract',
   endorsement = 'endorsement',
@@ -72,6 +75,9 @@ export enum TXTypes {
   register = 'register',
   create = 'create',
   transfer = 'transfer',
+  bridge_deposit = 'bridge_deposit',
+  bridge_withdraw = 'bridge_withdraw',
+  bridge_fund = 'bridge_fund',
   profile = 'profile',
   contract = 'contract',
   endorsement = 'endorsement',
@@ -764,6 +770,7 @@ export type AccountVariant =
   | DaoProposalsMeta
   | DaoProposalAccount
   | ProofOfSkillAccount
+  | { id: string; type: 'BridgeReserve' | 'BridgeRecord'; hash: string; timestamp: number; [key: string]: any }
 
 /**
  * ---------------------- NETWORK DATA export interfaceS ----------------------

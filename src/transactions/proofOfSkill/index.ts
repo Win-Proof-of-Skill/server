@@ -10,6 +10,7 @@ import { profilesAccount } from '../../accounts/profile'
 import { contractsAccount } from '../../accounts/contract'
 import { scoresAccount } from '../../accounts/score'
 import { skillsAccount } from '../../accounts/skill'
+import { userAccount } from '../../accounts/userAccount'
 import { endorsementsAccount } from '../../accounts/endorsement'
 
 const factories = { [profilesAddress]: profilesAccount, [contractsAddress]: contractsAccount, [scoresAddress]: scoresAccount, [skillsAddress]: skillsAccount, [endorsementsAddress]: endorsementsAccount }
@@ -47,6 +48,8 @@ function draft(tx: ProofOfSkillTx, states: WrappedStates, now: number, txId: str
   if (!fieldResult.success) throw new Error(fieldResult.reason)
   const sender = states[tx.from]?.data as UserAccount
   if (sender?.type !== 'UserAccount' || sender.data.balance < tx.fee) throw new Error('Existing funded sender wallet required')
+  const collector = states[formulas.feeRecipient]?.data as UserAccount
+  if (collector?.id !== formulas.feeRecipient || collector.type !== 'UserAccount' || typeof collector.data.balance !== 'bigint') throw new Error('Invalid fee account')
   const read = <T>(id: string): T => {
     const data = states[id]?.data
     if (!data || data.id !== id || data.type !== registryTypes[id]) throw new Error(`Invalid registry ${id}`)
@@ -83,6 +86,9 @@ export function apply(tx: ProofOfSkillTx, now: number, txId: string, states: Wra
   }
   sender.data.balance -= tx.fee
   sender.timestamp = now
+  const collector = states[formulas.feeRecipient].data as UserAccount
+  collector.data.balance += tx.fee
+  collector.timestamp = now
   const receipt: AppReceiptData = {
     networkId: tx.networkId,
     txId,
@@ -111,12 +117,13 @@ export function createFailedAppReceiptData(
 export function keys(tx: ProofOfSkillTx, result: ShardusTypes.TransactionKeys): ShardusTypes.TransactionKeys {
   result.sourceKeys = [tx.from]
   result.targetKeys = tx.type === 'profile' ? [profilesAddress, scoresAddress] : tx.type === 'contract' ? [profilesAddress, contractsAddress, scoresAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress, endorsementsAddress] : [profilesAddress, scoresAddress, skillsAddress]
+  result.targetKeys = [...new Set([...result.targetKeys, formulas.feeRecipient])].filter(id => !result.sourceKeys.includes(id))
   result.allKeys = [...result.sourceKeys, ...result.targetKeys]
   return result
 }
 export function memoryPattern(tx: ProofOfSkillTx): ShardusTypes.ShardusMemoryPatternsInput {
   return {
-    rw: tx.type === 'profile' ? [tx.from, profilesAddress, scoresAddress] : tx.type === 'contract' ? [tx.from, contractsAddress, scoresAddress] : tx.type === 'endorsement' ? [tx.from, endorsementsAddress] : [tx.from, skillsAddress],
+    rw: tx.type === 'profile' ? [...new Set([tx.from, profilesAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'contract' ? [...new Set([tx.from, contractsAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'endorsement' ? [...new Set([tx.from, endorsementsAddress, formulas.feeRecipient])] : [...new Set([tx.from, skillsAddress, formulas.feeRecipient])],
     ro: tx.type === 'contract' ? [profilesAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress] : tx.type === 'skill' ? [profilesAddress, scoresAddress] : [],
     wo: [],
     on: [],
@@ -128,7 +135,7 @@ export function createRelevantAccount(dapp: Shardus, data: any, accountId: strin
   if (!permitted.includes(accountId)) throw new Error('Undeclared object transaction account')
   if (!data) {
     if (accountId === tx.from) throw new Error('Sender wallet does not exist')
-    data = factories[accountId]()
+    data = accountId === formulas.feeRecipient ? userAccount(accountId, tx.timestamp) : factories[accountId]()
     accountCreated = true
   }
   if (registryTypes[accountId] && data.type !== registryTypes[accountId]) throw new Error('Protected address contains the wrong account type')

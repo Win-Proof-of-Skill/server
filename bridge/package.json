@@ -1,0 +1,6 @@
+{
+  "name":"win-reserve-bridge", "private":true, "type":"module",
+  "scripts":{"compile":"node compile.mjs","operator":"node operator.mjs","test":"node --test test/*.test.mjs"},
+  "dependencies":{"@openzeppelin/contracts":"5.4.0","ethers":"6.13.4"},
+  "devDependencies":{"solc":"0.8.30","ganache":"7.9.2"}
+}

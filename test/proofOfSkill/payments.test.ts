@@ -7,7 +7,7 @@ import { userAccount } from '../../src/accounts/userAccount'
 import { chatAccount } from '../../src/accounts/chatAccount'
 import { deserializeAccounts, serializeAccounts } from '../../src/accounts'
 import { Tx, TXTypes, WrappedStates } from '../../src/@types'
-import { formulas } from '../../src/config/formulas'
+import { formulas, transferFee } from '../../src/config/formulas'
 import { WIN_NETWORK_ID, profilesAddress, contractsAddress, endorsementsAddress, scoresAddress, skillsAddress } from '../../src/config'
 
 const from = 'a'.repeat(64),
@@ -25,7 +25,7 @@ const tx = (): Tx.Transfer => ({
   from,
   to,
   amount: 123456789012345678901234n,
-  fee: formulas.transferFee,
+  fee: transferFee(123456789012345678901234n),
   nonce: 1,
   chatId: utils.calculateChatId(from, to),
   timestamp: now,
@@ -38,7 +38,7 @@ function states(transaction = tx()): WrappedStates {
     chat = chatAccount(transaction.chatId, transaction)
   sender.data.balance = transaction.amount + transaction.fee
   return Object.fromEntries(
-    [sender, recipient, chat].map((account) => [account.id, { accountId: account.id, data: account, timestamp: 0, stateId: account.hash }]),
+    [sender, recipient, chat, userAccount(formulas.feeRecipient, now)].map((account) => [account.id, { accountId: account.id, data: account, timestamp: 0, stateId: account.hash }]),
   ) as unknown as WrappedStates
 }
 beforeEach(() => {
@@ -64,8 +64,9 @@ test('exact atomic transfer debits once, credits the recipient, and consumes the
   transfer.apply(transaction, now, 'tx-id', wrapped, dapp, result)
   expect(wrapped[from].data.data.balance).toBe(0n)
   expect(wrapped[to].data.data.balance).toBe(transaction.amount)
+  expect(wrapped[formulas.feeRecipient].data.data.balance).toBe(transaction.fee)
   expect(wrapped[from].data.data.transferNonce).toBe(1)
-  expect(result.receipt.transactionFee).toBe(formulas.transferFee)
+  expect(result.receipt.transactionFee).toBe(transaction.fee)
   expect(result.receipt.networkId).toBe(WIN_NETWORK_ID)
   expect(deserializeAccounts(serializeAccounts(wrapped[from].data).getBuffer())).toEqual(wrapped[from].data)
 })

@@ -1,3 +1,5 @@
+import { paymentMessages } from './payments'
+import { reserveBridgeStatus, reserveBridgeRecord } from './reserveBridge'
 import { proofOfSkillRecord, proofOfSkillDirectory } from './proofOfSkill'
 import { bridgeStatus } from './bridge'
 import { inject } from './inject'
@@ -22,6 +24,8 @@ export default (dapp: Shardus): void => {
   }
 
   dapp.registerExternalGet('network/parameters', network.current(dapp))
+  dapp.registerExternalGet('bridge/v2/status', reserveBridgeStatus(dapp))
+  dapp.registerExternalGet('bridge/v2/records/:kind/:id', reserveBridgeRecord(dapp))
   dapp.registerExternalGet('bridge/status', bridgeStatus(dapp))
 
   // New DAO API routes — Shardus applies registerExternalGet routes in LIFO order
@@ -44,6 +48,7 @@ export default (dapp: Shardus): void => {
 
   dapp.registerExternalGet('transaction/:id', accounts.transactions(dapp))
 
+  dapp.registerExternalGet('payments/:chatId/:timestamp', paymentMessages(dapp))
   dapp.registerExternalGet('messages/:chatId/:timestamp', messages.messages(dapp))
   dapp.registerExternalGet('messages/:chatId/toll', messages.toll(dapp))
 
