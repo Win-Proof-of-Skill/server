@@ -62,10 +62,27 @@ async function read(url) {
   if (!response.ok) throw new Error('Native gateway unavailable')
   return response.json()
 }
+export function nativeGatewayPolicy(c) {
+  const mode = c.nativeGatewayMode ?? 'quorum'
+  if (!['quorum', 'single'].includes(mode)) throw new Error('Invalid native gateway mode')
+  const expected = mode === 'single' ? 1 : 3
+  const countError = mode === 'single' ? 'Single gateway mode requires exactly one native gateway' : 'Three independent native gateways required'
+  if (!Array.isArray(c.nativeGateways) || c.nativeGateways.length !== expected) throw new Error(countError)
+  const gateways = c.nativeGateways.map((value) => {
+    const u = new URL(value)
+    if (u.username || u.password || u.search || u.hash ||
+      !(u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))))
+      throw new Error('Secure trusted native gateways required')
+    return u.toString().replace(/\/$/, '')
+  })
+  if (new Set(gateways).size !== expected) throw new Error(countError)
+  return { mode, gateways, threshold: mode === 'single' ? 1 : 2 }
+}
 export async function withdrawalEvidence(c, id, reader = read) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid native withdrawal ID')
+  const policy = nativeGatewayPolicy(c)
   const outcomes = await Promise.allSettled(
-    c.nativeGateways.map(async (base) => {
+    policy.gateways.map(async (base) => {
       const result = await reader(base + '/bridge/v2/records/bridge_withdraw/' + id)
       const r = result?.record
       if (
@@ -100,22 +117,28 @@ export async function withdrawalEvidence(c, id, reader = read) {
       const key = JSON.stringify(r.value)
       counts.set(key, (counts.get(key) || 0) + 1)
     }
-  const agreement = [...counts].find(([, count]) => count >= 2)
-  if (!agreement) throw new Error('Two trusted native gateways must agree on the committed withdrawal')
+  const agreement = [...counts].find(([, count]) => count >= policy.threshold)
+  if (!agreement) throw new Error(policy.mode === 'single'
+    ? 'Trusted native gateway must confirm the committed withdrawal and successful receipt'
+    : 'Two trusted native gateways must agree on the committed withdrawal')
   return JSON.parse(agreement[0])
 }
 export function loadConfig(file) {
   const c = JSON.parse(fs.readFileSync(file, 'utf8'))
+  return validateConfig(c)
+}
+export function validateConfig(c) {
   if (
     !/^[a-f0-9]{64}$/.test(c.networkId) ||
     !/^0x[a-f0-9]{40}$/.test(c.vaultAddress) ||
     !hash(c.vaultCodeHash) ||
     c.operators?.length !== 3 ||
-    new Set(c.operators).size !== 3
+    new Set(c.operators).size !== 3 ||
+    c.operators.some((address) => !/^0x[a-f0-9]{40}$/.test(address))
   )
     throw new Error('Invalid deployment config')
-  if (c.nativeGateways?.length !== 3 || new Set(c.nativeGateways).size !== 3) throw new Error('Three independent native gateways required')
-  for (const value of [...c.nativeGateways, c.bnbRpc]) {
+  nativeGatewayPolicy(c)
+  for (const value of [c.bnbRpc]) {
     const u = new URL(value)
     if (
       u.username ||
@@ -135,10 +158,31 @@ export function loadConfig(file) {
     throw new Error('Explicit secure wallet origin required')
   return c
 }
+export function readOperatorKey(file) {
+  const stat = fs.lstatSync(file)
+  if (!stat.isFile() || (process.platform !== 'win32' && (stat.mode & 0o077)))
+    throw new Error('Operator key must be a private regular file (chmod 600)')
+  let key
+  try {
+    key = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!/^0x[a-fA-F0-9]{64}$/.test(key.privateKey)) throw new Error()
+    const signer = new Wallet(key.privateKey)
+    if (key.address && key.address.toLowerCase() !== signer.address.toLowerCase()) throw new Error()
+    return signer
+  } catch {
+    throw new Error('Invalid operator key file; restore the matching key')
+  }
+}
 export async function serve() {
   const c = loadConfig(process.env.WIN_BRIDGE_CONFIG)
-  const signer = new Wallet(process.env.WIN_BRIDGE_OPERATOR_KEY)
+  if (process.env.WIN_BRIDGE_KEY_FILE && process.env.WIN_BRIDGE_OPERATOR_KEY)
+    throw new Error('Set only WIN_BRIDGE_KEY_FILE or WIN_BRIDGE_OPERATOR_KEY')
+  const signer = process.env.WIN_BRIDGE_KEY_FILE
+    ? readOperatorKey(process.env.WIN_BRIDGE_KEY_FILE)
+    : new Wallet(process.env.WIN_BRIDGE_OPERATOR_KEY)
   if (!c.operators.includes(signer.address.toLowerCase())) throw new Error('Key is not a configured operator')
+  const policy = nativeGatewayPolicy(c)
+  if (policy.mode === 'single') console.warn('Single gateway mode: withdrawal evidence trusts one native gateway. Two operator signatures are still required.')
   const transport = new FetchRequest(c.bnbRpc)
   transport.timeout = 10000
   const provider = new JsonRpcProvider(transport),
@@ -155,7 +199,7 @@ export async function serve() {
     }
     if (req.method === 'GET' && req.url === '/health') {
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ networkId: c.networkId, vaultAddress: c.vaultAddress, operator: signer.address.toLowerCase() }))
+      res.end(JSON.stringify({ networkId: c.networkId, vaultAddress: c.vaultAddress, operator: signer.address.toLowerCase(), nativeGatewayMode: policy.mode, nativeGatewayQuorum: policy.threshold }))
       return
     }
     if (req.method !== 'POST' || !['/deposit', '/withdraw'].includes(req.url)) {
@@ -188,6 +232,8 @@ export async function serve() {
   })
   server.requestTimeout = 15000
   server.headersTimeout = 10000
+  server.once('close', () => provider.destroy())
   server.listen(Number(process.env.PORT || 8081), '127.0.0.1', () => console.log('WIN bridge operator listening on loopback'))
+  return server
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await serve()

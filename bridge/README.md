@@ -15,9 +15,9 @@ The existing asset is chain 56, token `0x8a27363dd26f78b09014338e106b16055fcb979
 
 ## Trust and replay protection
 
-Two of three configured operators must attest. Run each signer under independent control, with separate keys and infrastructure. Two compromised operators can authorize false deposits or payouts. Native validators verify EIP-712 attestations; this is not an on-chain BNB light client.
+Two of three configured operators must attest. For independent protection, run each signer under separate control, with separate keys and infrastructure. The explicitly centralized [single-server setup](SINGLE-SERVER.md) keeps the two-signature requirement but shares a host and one trusted native gateway. Two compromised operators can authorize false deposits or payouts. Native validators verify EIP-712 attestations; this is not an on-chain BNB light client.
 
-Deposit operators require a successful vault event in a canonical block at or before BNB's `finalized` block. Withdrawal operators require two of three **trusted, independently operated native gateways** to agree on both the committed record and its successful receipt. Gateway trust is part of this design; the observer does not verify native consensus certificates itself. Do not configure three names for the same backend and call them independent.
+Deposit operators require a successful vault event in a canonical block at or before BNB's `finalized` block. By default, withdrawal operators require two of three **trusted, independently operated native gateways** to agree on both the committed record and its successful receipt. Explicit `nativeGatewayMode: "single"` accepts exactly one configured gateway, while still requiring both the matching committed record and successful receipt. An unavailable gateway fails closed; the default mode never falls back to one gateway. Gateway trust is part of this design; the observer does not verify native consensus certificates itself. Do not configure three names for the same backend and call them independent.
 
 The EIP-712 domain binds chain, vault, protocol version and native network ID. Native event records, wallet nonces and the vault's release map prevent duplicate payouts. The native reserve tracks total funding and reserves outgoing value at withdrawal commitment: withdrawals cannot exceed prior verified deposits, even before pending BNB releases settle. A supply cap limits total native reserve funding. Failed native validation changes no balances and charges no fee.
 
@@ -48,7 +48,7 @@ The wallet saves signed transactions in its encrypted account backup before subm
 
    Example cap is 100 WIN; choose the funded liquidity limit deliberately. This is a consensus upgrade: deploy compatible validator code/config together, preserve account data, and do not change the application network ID. The previous `bridge.json` diagnostics remain for compatibility; the wallet uses `/bridge/v2/status`.
 5. Fund native reserve `6000000000000000000000000000000000000000000000000000000000000000` using the `bridge_fund` operation. Ordinary transfers to that protected address are rejected. `fund-reserve.mjs` defaults to preparing a signed transaction only. Set `WIN_NATIVE_GATEWAY`, `WIN_NATIVE_FUNDING_KEY`, `WIN_RESERVE_AMOUNT` (decimal WIN), and `WIN_RESERVE_TX_FILE` (private file outside the repository). Review its amount, then explicitly set `CONFIRM_NATIVE_RESERVE_FUNDING=yes` and rerun with `--broadcast`. The same saved transaction is reused for retries. Confirm its successful native receipt. Funding uses existing coins and is not recoverable through a reserve-admin withdrawal.
-6. Each operator needs an external JSON file containing `networkId`, `vaultAddress`, `vaultCodeHash`, `operators`, `bnbRpc`, exactly three `nativeGateways`, and `walletOrigin` (the HTTPS wallet origin). Set `WIN_BRIDGE_CONFIG` to that file and `WIN_BRIDGE_OPERATOR_KEY` to that host's operator key. Never commit keys or put them in client JavaScript.
+6. Each operator needs an external JSON file containing `networkId`, `vaultAddress`, `vaultCodeHash`, `operators`, `bnbRpc`, exactly three `nativeGateways`, and `walletOrigin` (the HTTPS wallet origin). Set `WIN_BRIDGE_CONFIG` to that file. Supply the key through `WIN_BRIDGE_KEY_FILE` (a private JSON file containing `privateKey` and optionally `address`) or the existing `WIN_BRIDGE_OPERATOR_KEY` environment setting, never both. For three processes using one local gateway, follow [the single-server guide](SINGLE-SERVER.md). Never commit keys or put them in client JavaScript.
 7. Run each operator on its own host:
 
    ```sh
@@ -60,8 +60,33 @@ The wallet saves signed transactions in its encrypted account backup before subm
 8. Set `enabled:true` identically on validators once reserve, vault and operators have been checked. Configure the client's HTTPS/WSS native gateway in `network.js`; the existing HTTP public URL is intentionally blocked. Serve the static wallet via HTTPS (PM2 can serve files behind the same reverse proxy).
 9. Perform a small controlled deposit, native receipt check, withdrawal and finalized BNB release with the deployment owner present. Check both liquidity balances and native fee receipts. Test an operator outage and wallet reload/recovery. Only then make the bridge available publicly.
 
+## Linux dependency installation
+
+The lockfile explicitly marks Ganache's nested `fsevents@2.3.2` dependency as optional. It is a macOS-only file watcher; Linux must skip it. Keep this flag if regenerating the lockfile, and verify a clean `npm ci --ignore-scripts` on Linux afterward. See the [npm shrinkwrap/platform issue](https://github.com/npm/cli/issues/7622).
+
+If an older checkout fails with `EBADPLATFORM` for `fsevents`, update to the corrected lockfile. To repair that older copy directly, run this from `server/bridge`:
+
+```sh
+node <<'NODE'
+const fs = require('node:fs');
+const path = 'package-lock.json';
+const lock = JSON.parse(fs.readFileSync(path, 'utf8'));
+const entry = lock.packages['node_modules/ganache/node_modules/fsevents'];
+if (!entry || entry.version !== '2.3.2' || !entry.os?.includes('darwin')) {
+  throw new Error('Unexpected dependency entry; use the updated bridge lockfile.');
+}
+entry.optional = true;
+fs.writeFileSync(path, JSON.stringify(lock, null, 2) + '\n');
+NODE
+npm ci --ignore-scripts
+npm run compile
+npm test
+```
+
+This preserves all pinned versions and integrity hashes. Do not bypass platform checks with `--force` or delete the lockfile to work around this error. No keys or live network transactions are needed for these checks.
+
 ## Verification performed
 
-Local EVM tests exercise a real compiled vault and synthetic ERC-20, valid payout, replay, duplicate signatures, changed amounts and wrong signing domain. Native handler tests cover conservation, 0.5% fees, reserve caps, source replay, invalid signatures and serialization across restart. Client companion tests cover ABI compatibility with ethers, signature recovery, finality, distinct quorum, fee rounding and resumed deposit/withdrawal flows. No live BNB or multi-validator end-to-end bridge deployment was exercised.
+Local EVM tests exercise a real compiled vault and synthetic ERC-20, valid payout, replay, duplicate signatures, changed amounts and wrong signing domain. Native handler tests cover conservation, 0.5% fees, reserve caps, source replay, invalid signatures and serialization across restart. Client companion tests cover ABI compatibility with ethers, signature recovery, finality, distinct quorum, fee rounding and resumed deposit/withdrawal flows. Additional operator tests cover explicit single-gateway validation, successful receipt requirements, preservation of the default quorum during outages, existing-key preservation, deployment/key matching, private key-file permissions, and three concurrently running local HTTP services against a simulated BNB RPC. No live BNB or multi-validator end-to-end bridge deployment was exercised.
 
 References: [BNB finality](https://docs.bnbchain.org/bnb-smart-chain/introduction/), [OpenZeppelin cryptography](https://docs.openzeppelin.com/contracts/5.x/api/utils/cryptography).
