@@ -45,7 +45,7 @@ cd win-pskill
 npm install
 ```
 
-**Start the isolated local network** (10 validators, one archiver, one monitor):
+**Start the isolated local network** (3 validators, one archiver, one monitor):
 
 ```bash
 npm run local:start
@@ -66,10 +66,14 @@ npm run local:check
 
 Startup compiles the current source. Allow several minutes for network formation;
 the local launcher uses 15-second consensus rounds to shorten development checks.
-`local:check` exits successfully only when all ten validators report the local WIN
-network, a recent processing cycle with ten active validators is available from
+`local:check` exits successfully only when all three validators report the local WIN
+network, a recent processing cycle with exactly three active validators is available from
 the validators and archiver, and the monitor responds. A running process alone
 does not establish network readiness.
+
+`src/config/local-network.json` defines three validators, a consensus group of
+three, and one edge node. The local server pins these settings even if inherited
+environment variables request a larger network. Deployment defaults are unchanged.
 
 Data, logs, generated archiver keys, and the local process manager live under
 `instances-local/` (ignored by Git). Starting or stopping never deletes this data.
@@ -99,6 +103,15 @@ a hash mismatch, or a ledger without a shutdown checkpoint stops the launch.
 No public shutdown API is added. Run `npm run local:test` for the launcher isolation
 checks after installing dependencies.
 
+Older ten-node manifests remain readable for `local:status`, `local:check` and
+`local:stop`. After a verified shutdown checkpoint and with all services stopped,
+the next start changes the manifest to three nodes and starts ports 9001–9003.
+The previous manifest is saved as `local-network.10-nodes.json` with private file
+permissions. Network ID, keys, archived history and all node directories remain
+intact, including the seven unused directories. An old network stopped without a
+shutdown checkpoint is not automatically resized or reset; its recovery must be
+resolved before starting it. Do not delete its ledger to bypass that check.
+
 If startup fails, inspect `instances-local/<service>/stderr.log` and the service's
 own logs. Run `local:stop` before retrying a partially started network. The launcher
 refuses to overwrite an unrecognized local directory or modified node configuration.
@@ -127,7 +140,7 @@ Local services started with the network:
 | --- | --- |
 | Shardus Monitor | http://127.0.0.1:3000 (local login: `admin` / `password`) |
 | Archive Server | http://127.0.0.1:4000 |
-| Validator APIs | http://127.0.0.1:9001 through http://127.0.0.1:9010 |
+| Validator APIs | http://127.0.0.1:9001 through http://127.0.0.1:9003 |
 
 The web client, gateway, and explorer are not started by this backend launcher.
 The web client's deployment endpoints are not changed by the local commands.

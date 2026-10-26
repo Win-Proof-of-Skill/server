@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..')
 function config(extra = {}) {
   const env = { ...process.env }
   for (const key of ['WIN_LOCAL_TEST', 'WIN_LOCAL_NETWORK_ID', 'WIN_LOCAL_ARCHIVER_VERSION', 'BASE_DIR', 'APP_SEEDLIST', 'EXISTING_ARCHIVERS']) delete env[key]
-  return spawnSync(process.execPath, ['-e', `const c = require('./dist/config'); process.stdout.write(JSON.stringify({ id: c.WIN_NETWORK_ID, local: c.IS_LOCAL_TEST, staking: c.WinFlags.StakingEnabled, archiver: c.INITIAL_PARAMETERS.archiver, ip: c.default.server.ip, p2p: { min: c.default.server.p2p.minNodes, max: c.default.server.p2p.maxNodes, rotate: c.default.server.p2p.maxRotatedPerCycle } }));`], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8' })
+  return spawnSync(process.execPath, ['-e', `const c = require('./dist/config'); process.stdout.write(JSON.stringify({ id: c.WIN_NETWORK_ID, local: c.IS_LOCAL_TEST, staking: c.WinFlags.StakingEnabled, archiver: c.INITIAL_PARAMETERS.archiver, ip: c.default.server.ip, p2p: { min: c.default.server.p2p.minNodes, max: c.default.server.p2p.maxNodes, baseline: c.default.server.p2p.baselineNodes, rotate: c.default.server.p2p.maxRotatedPerCycle }, sharding: c.default.server.sharding }));`], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8' })
 }
 const local = {
   WIN_LOCAL_TEST: '1', WIN_LOCAL_NETWORK_ID: 'a'.repeat(64), WIN_LOCAL_ARCHIVER_VERSION: '1.0.0',
@@ -26,8 +26,8 @@ test('default deployment keeps its network domain, staking and archiver gate', (
   assert.equal(data.archiver.minVersion, '3.8.3')
 })
 
-test('local configuration isolates the domain and pins ten loopback validators', () => {
-  const result = config({ ...local, APP_IP: '162.35.97.118', minNodes: '100', maxNodes: '1000', maxRotatedPerCycle: '10' })
+test('local configuration isolates the domain and pins three loopback validators and their consensus group', () => {
+  const result = config({ ...local, APP_IP: '162.35.97.118', minNodes: '100', maxNodes: '1000', baselineNodes: '100', maxRotatedPerCycle: '10', nodesPerConsensusGroup: '10', nodesPerEdge: '5' })
   assert.equal(result.status, 0, result.stderr)
   assert.ifError(result.error)
   const data = JSON.parse(result.stdout.trim().split('\n').at(-1))
@@ -37,7 +37,55 @@ test('local configuration isolates the domain and pins ten loopback validators',
   assert.equal(data.archiver.minVersion, '1.0.0')
   assert.equal(data.ip.externalIp, '127.0.0.1')
   assert.equal(data.ip.internalIp, '127.0.0.1')
-  assert.deepEqual(data.p2p, { min: 10, max: 10, rotate: 0 })
+  assert.deepEqual(data.p2p, { min: 3, max: 3, baseline: 3, rotate: 0 })
+  assert.equal(data.sharding.nodesPerConsensusGroup, 3)
+  assert.equal(data.sharding.nodesPerEdge, 1)
+})
+
+test('launcher uses three validator ports and rejects stale, partial or mismatched processing cycles', () => {
+  const { ports, validatorCount, processingCycle } = require('./local-network')
+  assert.equal(validatorCount, 3)
+  assert.deepEqual(ports, [3000, 4000, 9001, 9002, 9003, 10001, 10002, 10003])
+  const cycle = { mode: 'processing', active: 3, start: Date.now() / 1000, duration: 15 }
+  assert.equal(processingCycle(cycle, 3), true)
+  for (const change of [{ active: 2 }, { active: 10 }, { mode: 'forming' }, { start: 0 }, { duration: -1 }]) {
+    assert.equal(processingCycle({ ...cycle, ...change }, 3), false)
+  }
+  const shardFunctions = require('@shardus/core/dist/state-manager/shardFunctions').default
+  const globals = shardFunctions.calculateShardGlobals(3, 3, 1)
+  assert.equal(globals.numActiveNodes, 3)
+  assert.equal(globals.nodesPerConsenusGroup, 3)
+  assert.equal(globals.consensusRadius, 1)
+})
+
+test('a ten-node resize preserves identity, keys, backup and node data, and requires a stopped checkpoint', t => {
+  const fs = require('node:fs')
+  const os = require('node:os')
+  const { readManifest, resizeManifest } = require('./local-network')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'win-resize-test-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const file = path.join(dir, 'local-network.json')
+  const manifest = { format: 2, root, nodes: 10, networkId: 'a'.repeat(64), authority: { publicKey: 'test-authority' }, archiver: { publicKey: 'test-archiver' } }
+  const original = JSON.stringify(manifest)
+  fs.writeFileSync(file, original, { mode: 0o600 })
+  fs.mkdirSync(path.join(dir, 'win-local-node-9010'))
+  fs.writeFileSync(path.join(dir, 'win-local-node-9010', 'ledger.fixture'), 'preserve')
+  const queue = { networkId: manifest.networkId, cycle: 1, mode: 'shutdown' }
+  assert.deepEqual(readManifest(dir), manifest)
+  assert.throws(() => resizeManifest(manifest, queue, [{ status: 'online' }], file), /stopped services/)
+  for (const change of [{ cycle: -1 }, { mode: 'processing' }, { networkId: 'b'.repeat(64) }]) {
+    assert.throws(() => resizeManifest(manifest, { ...queue, ...change }, [], file), /checkpoint/)
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), original)
+  const updated = resizeManifest(manifest, queue, [], file)
+  assert.deepEqual(updated, { ...manifest, nodes: 3 })
+  assert.deepEqual(readManifest(dir), updated)
+  const backup = path.join(dir, 'local-network.10-nodes.json')
+  assert.equal(fs.readFileSync(backup, 'utf8'), original)
+  assert.equal(fs.statSync(backup).mode & 0o777, 0o600)
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600)
+  assert.equal(fs.readFileSync(path.join(dir, 'win-local-node-9010', 'ledger.fixture'), 'utf8'), 'preserve')
+  assert.deepEqual(resizeManifest(updated, queue, [], file), updated)
 })
 
 test('local configuration rejects a missing/deployment domain, unsupported archiver, and remote discovery', () => {

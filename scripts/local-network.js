@@ -6,20 +6,24 @@ const net = require('net')
 const http = require('http')
 const { randomBytes } = require('crypto')
 const { spawnSync } = require('child_process')
+const topology = require('../src/config/local-network.json')
+const validatorCount = topology.validators
 
 const root = path.resolve(__dirname, '..')
 const directory = path.join(root, 'instances-local')
 const manifestPath = path.join(directory, 'local-network.json')
 const ecosystemPath = path.join(directory, 'ecosystem.config.json')
 const hashKey = '69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc'
-const ports = [3000, 4000, ...Array.from({ length: 10 }, (_, i) => 9001 + i), ...Array.from({ length: 10 }, (_, i) => 10001 + i)]
+const ports = [3000, 4000, ...Array.from({ length: validatorCount }, (_, i) => 9001 + i), ...Array.from({ length: validatorCount }, (_, i) => 10001 + i)]
 
-function readManifest() {
-  if (!fs.existsSync(directory)) return null
-  if (fs.lstatSync(directory).isSymbolicLink()) throw new Error('Refusing a symlink as the local network directory')
-  if (!fs.existsSync(manifestPath)) throw new Error('instances-local exists without a WIN manifest; no files were overwritten')
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-  if (manifest.format !== 2 || manifest.root !== root || manifest.nodes !== 10 || !/^[a-f0-9]{64}$/.test(manifest.networkId) || !manifest.authority) {
+function readManifest(dataDirectory = directory) {
+  if (!fs.existsSync(dataDirectory)) return null
+  if (fs.lstatSync(dataDirectory).isSymbolicLink()) throw new Error('Refusing a symlink as the local network directory')
+  const file = path.join(dataDirectory, 'local-network.json')
+  if (!fs.existsSync(file)) throw new Error('instances-local exists without a WIN manifest; no files were overwritten')
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
+  // Keep legacy manifests readable so stop/check still work before resizing.
+  if (manifest.format !== 2 || manifest.root !== root || ![validatorCount, 10].includes(manifest.nodes) || !/^[a-f0-9]{64}$/.test(manifest.networkId) || !manifest.authority) {
     throw new Error('Local manifest does not match this checkout; no files were overwritten')
   }
   return manifest
@@ -86,7 +90,30 @@ async function recoverQueue(manifest, database = path.join(directory, 'win-local
     })
   }
   if (lastCycle && lastCycle.mode !== 'shutdown') throw new Error('The saved local network has no shutdown checkpoint. Preserve its data and inspect recovery before restarting.')
-  return { networkId: manifest.networkId, cycle: lastCycle?.counter ?? -1, hash: crypto.hashObj(txList), txList }
+  return { networkId: manifest.networkId, cycle: lastCycle?.counter ?? -1, mode: lastCycle?.mode ?? null, hash: crypto.hashObj(txList), txList }
+}
+
+function resizeManifest(manifest, queue, running, file = manifestPath) {
+  if (manifest.nodes === validatorCount) return manifest
+  if (running.length || manifest.nodes !== 10 || queue.networkId !== manifest.networkId || queue.cycle < 0 || queue.mode !== 'shutdown') {
+    throw new Error('Resizing requires stopped services and a verified shutdown checkpoint; existing data was preserved')
+  }
+  const original = fs.readFileSync(file, 'utf8')
+  if (JSON.stringify(JSON.parse(original)) !== JSON.stringify(manifest)) throw new Error('Local manifest changed during startup; no files were overwritten')
+  const backup = file.replace(/\.json$/, '.10-nodes.json')
+  if (fs.existsSync(backup)) {
+    if (fs.readFileSync(backup, 'utf8') !== original) throw new Error('Existing ten-node manifest backup differs; no files were overwritten')
+  } else fs.writeFileSync(backup, original, { flag: 'wx', mode: 0o600 })
+  const updated = { ...manifest, nodes: validatorCount }
+  const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(updated, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+    fs.renameSync(temporary, file)
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary)
+  }
+  console.log(`Local network resized to ${validatorCount} validators. Network ID, keys, ledger and unused node directories are preserved.`)
+  return updated
 }
 
 function prepare() {
@@ -94,13 +121,14 @@ function prepare() {
   if (existing) return existing
   const crypto = require('@shardus/lib-crypto-utils')
   crypto.init(hashKey)
-  const manifest = { format: 2, root, nodes: 10, networkId: randomBytes(32).toString('hex'), archiver: crypto.generateKeypair(), authority: crypto.generateKeypair() }
+  const manifest = { format: 2, root, nodes: validatorCount, networkId: randomBytes(32).toString('hex'), archiver: crypto.generateKeypair(), authority: crypto.generateKeypair() }
   fs.mkdirSync(directory, { mode: 0o700 })
   jsonWrite(manifestPath, manifest)
   return manifest
 }
 
 function environment(manifest) {
+  if (manifest.nodes !== validatorCount) throw new Error('Resize the saved network before preparing validator configuration')
   return {
     WIN_LOCAL_TEST: '1', WIN_LOCAL_NETWORK_ID: manifest.networkId, WIN_LOCAL_ARCHIVER_VERSION: '1.0.0',
     WIN_LOCAL_AUTHORITY_PUBLIC_KEY: manifest.authority.publicKey,
@@ -108,8 +136,8 @@ function environment(manifest) {
     APP_SEEDLIST_PUBLIC_KEY: manifest.archiver.publicKey,
     EXISTING_ARCHIVERS: JSON.stringify([{ ip: '127.0.0.1', port: 4000, publicKey: manifest.archiver.publicKey }]),
     ARCHIVER_INFO: `127.0.0.1:4000:${manifest.archiver.publicKey}`,
-    minNodes: '10', baselineNodes: '10', maxNodes: '10', maxRotatedPerCycle: '0',
-    nodesPerConsensusGroup: '10', nodesPerEdge: '5', CYCLE_DURATION: '15',
+    minNodes: String(validatorCount), baselineNodes: String(validatorCount), maxNodes: String(validatorCount), maxRotatedPerCycle: '0',
+    nodesPerConsensusGroup: String(topology.consensusGroup), nodesPerEdge: String(topology.edgeNodes), CYCLE_DURATION: '15',
   }
 }
 
@@ -173,7 +201,7 @@ function ecosystem(manifest, resolved, queue) {
     app('win-local-monitor', path.join(monitorRuntime, path.relative(monitorPackage, resolved.monitor)), { PORT: '3000', HOST: '127.0.0.1', NODE_ENV: 'debug', NAME: 'admin', PASSWORD: 'password' }),
   ]
   apps[0].node_args = [...common.node_args, '--require', path.join(__dirname, 'local-archiver-bootstrap.js')]
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < manifest.nodes; i++) {
     const port = 9001 + i
     const node = app(`win-local-node-${port}`, path.join(root, 'dist/index.js'), {})
     node.env.BASE_DIR = node.cwd
@@ -246,15 +274,20 @@ function request(port, route) {
   })
 }
 
+function processingCycle(cycle, expectedNodes) {
+  return Boolean(cycle?.mode === 'processing' && cycle.active === expectedNodes &&
+    Number.isFinite(cycle.start) && Number.isFinite(cycle.duration) && cycle.duration > 0 &&
+    Math.abs(Date.now() - cycle.start * 1000) < (cycle.duration + 90) * 1000)
+}
+
 async function check(manifest) {
-  const results = await Promise.all(Array.from({ length: 10 }, async (_, i) => {
+  const results = await Promise.all(Array.from({ length: manifest.nodes }, async (_, i) => {
     const port = 9001 + i
     try {
       const [data, newest] = await Promise.all([request(port, '/network/parameters'), request(port, '/sync-newest-cycle')])
       const cycle = newest.newestCycle
-      const fresh = cycle && Math.abs(Date.now() - cycle.start * 1000) < (cycle.duration + 90) * 1000
       const ok = data.protocol?.networkId === manifest.networkId && data.parameters?.current?.archiver?.minVersion === '1.0.0' &&
-        cycle?.mode === 'processing' && cycle.active >= 10 && fresh
+        processingCycle(cycle, manifest.nodes)
       const detail = data.protocol?.networkId !== manifest.networkId ? 'WIN parameters unavailable / unexpected network' : `${cycle?.mode || 'starting'} (${cycle?.active ?? 0} active validators)`
       console.log(`Validator ${port}: ${ok ? 'ready' : detail}`)
       return ok
@@ -263,7 +296,7 @@ async function check(manifest) {
   try {
     const data = await request(4000, '/cycleinfo/1')
     const cycle = data.cycleInfo?.[0]
-    const ok = cycle?.mode === 'processing' && cycle.active >= 10 && Math.abs(Date.now() - cycle.start * 1000) < (cycle.duration + 90) * 1000
+    const ok = processingCycle(cycle, manifest.nodes)
     console.log(`Archiver: cycle ${cycle?.counter ?? '?'}, mode ${cycle?.mode ?? '?'}, active validators ${cycle?.active ?? '?'}`)
     results.push(ok)
   } catch (error) { console.log(`Archiver: ${error.message}`); results.push(false) }
@@ -319,12 +352,13 @@ async function main(action) {
     const running = processes().filter(p => p.status === 'online' || p.status === 'launching')
     if (running.length) {
       console.log(`${running.length} local services already running; use local:status or local:check. Stop before restarting the complete network.`)
-      if (running.length !== 12) process.exitCode = 1
+      if (running.length !== validatorCount + 2 || manifest?.nodes !== validatorCount) process.exitCode = 1
       return
     }
     await availablePorts()
     manifest = prepare()
     const queue = await recoverQueue(manifest)
+    manifest = resizeManifest(manifest, queue, processes().filter(p => p.status === 'online' || p.status === 'launching'))
     ecosystem(manifest, resolved, queue)
     // PM2 can otherwise retain an old script path when an ecosystem entry changes.
     // Only stopped registrations in this network's private process manager are removed.
@@ -336,8 +370,8 @@ async function main(action) {
       try { await request(4000, '/nodeInfo'); archiverReady = true; break } catch { await new Promise(resolve => setTimeout(resolve, 1000)) }
     }
     if (!archiverReady) throw new Error('Archiver did not start. Inspect instances-local/win-local-archiver/stderr.log and run local:stop before retrying.')
-    pm2(['start', ecosystemPath, '--only', ['win-local-monitor', ...Array.from({ length: 10 }, (_, i) => `win-local-node-${9001 + i}`)].join(','), '--update-env'])
-    console.log(`Local network starting. Application ID: ${manifest.networkId}`)
+    pm2(['start', ecosystemPath, '--only', ['win-local-monitor', ...Array.from({ length: manifest.nodes }, (_, i) => `win-local-node-${9001 + i}`)].join(','), '--update-env'])
+    console.log(`Local network starting with ${manifest.nodes} validators. Application ID: ${manifest.networkId}`)
     console.log('Monitor: http://127.0.0.1:3000 (admin / password); archiver: http://127.0.0.1:4000')
     console.log('Formation can take several minutes. Run npm run local:check to verify readiness. Wallet funding is not configured.')
   } else if (!manifest) {
@@ -357,4 +391,4 @@ async function main(action) {
 }
 
 if (require.main === module) main(process.argv[2]).catch(error => { console.error(error.message); process.exitCode = 1 })
-module.exports = { readManifest, request, check, ports, recoverQueue }
+module.exports = { readManifest, request, check, ports, recoverQueue, resizeManifest, processingCycle, validatorCount }

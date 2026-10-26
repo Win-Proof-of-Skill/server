@@ -7,7 +7,7 @@ npm run local:start
 npm run local:check
 ```
 
-Wait for all validators to report ready, then open the client:
+Wait for all three validators to report ready, then open the client:
 
 ```bash
 npm run client
@@ -21,7 +21,15 @@ commands and `help` lists every command, including legacy administration/DAO too
 
 The client reads the WIN signing network ID from the node's `/network/parameters`.
 For local ports 9001–9010, it also checks the generated `instances-local` manifest
-when present. It does not use the consensus cycle's separate network ID.
+when present (the wider range preserves compatibility with older ten-node setups).
+The current launcher starts only ports 9001–9003. It does not use the consensus
+cycle's separate network ID.
+
+To resize an existing ten-node network, first use `local:stop` to obtain a shutdown
+checkpoint, then `local:start`. The launcher preserves the network ID, keys and
+ledger, backs up the old manifest, and leaves unused node directories in place.
+If the old network stopped without a checkpoint, startup refuses to resize it;
+preserve that state and resolve recovery rather than deleting it.
 
 ## Wallets and balances
 

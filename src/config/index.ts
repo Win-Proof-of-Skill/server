@@ -7,6 +7,7 @@ import { NetworkParameters } from '../@types'
 import { Utils } from '@shardus/lib-types'
 import { DevSecurityLevel, ShardusTypes } from '@shardus/core'
 import { wintoWei } from '../utils/units'
+import localNetwork from './local-network.json'
 
 export const networkAccount = '0'.repeat(64)
 
@@ -766,7 +767,14 @@ if (IS_LOCAL_TEST) {
   config = merge(config, {
     server: {
       ip: { externalIp: '127.0.0.1', internalIp: '127.0.0.1' },
-      p2p: { minNodes: 10, baselineNodes: 10, maxNodes: 10, maxRotatedPerCycle: 0, extraNodesToAddInRestart: 0 },
+      p2p: {
+        minNodes: localNetwork.validators,
+        baselineNodes: localNetwork.validators,
+        maxNodes: localNetwork.validators,
+        maxRotatedPerCycle: 0,
+        extraNodesToAddInRestart: 0,
+      },
+      sharding: { nodesPerConsensusGroup: localNetwork.consensusGroup, nodesPerEdge: localNetwork.edgeNodes },
       reporting: { recipient: 'http://127.0.0.1:3000/api' },
     },
   })
