@@ -1,9 +1,9 @@
 import { Shardus, ShardusTypes } from '@shardus/core'
 import { Utils } from '@shardus/lib-types'
 import { WIN_NETWORK_ID, isProtectedAddress } from '../config'
-import { bridgeReserveAddress, bridgeTypes, reserveBridge } from '../config/reserveBridge'
+import { bridgeReserveAddress, bridgeTypes, reserveBridge, bridgeAccounting } from '../config/reserveBridge'
 import { formulas } from '../config/formulas'
-import { bridgeQuote, bridgeRecord, verifyDeposit } from '../domain/reserveBridge'
+import { bridgeQuote, bridgeRecord, verifyDeposit, bridgeSupply } from '../domain/reserveBridge'
 import { userAccount } from '../accounts/userAccount'
 import * as crypto from '../crypto'
 
@@ -12,8 +12,9 @@ export const configuration = () => reserveBridge(WIN_NETWORK_ID)
 export function validate_fields(tx: any, response: any): any {
   response.success = false
   try {
+    if (tx.type === 'bridge_fund') throw new Error('Native reserve funding is retired; deposit BNB WIN through the vault')
     const config = configuration()
-    if (!config.configured || (!config.enabled && tx.type !== 'bridge_fund')) throw new Error('Bridge is not enabled')
+    if (!config.configured || !config.enabled || config.accounting !== bridgeAccounting) throw new Error('Bridge is not enabled')
     const common = ['type', 'from', 'to', 'networkId', 'timestamp', 'fee', 'amount', 'nonce', 'id', 'sign']
     const allowed = tx.type === 'bridge_deposit' ? [...common, 'signatures'] : tx.type === 'bridge_withdraw' ? [...common, 'recipient'] : common
     if (Object.keys(tx).some((k) => !allowed.includes(k)) || Buffer.byteLength(Utils.safeStringify(tx)) > 8192)
@@ -30,7 +31,7 @@ export function validate_fields(tx: any, response: any): any {
     if (!Number.isSafeInteger(tx.timestamp) || tx.timestamp <= 0 || !Number.isSafeInteger(tx.nonce) || tx.nonce < 1)
       throw new Error('Invalid bridge timestamp or nonce')
     const quote = bridgeQuote(tx.amount, tx.type)
-    if (tx.fee !== (tx.type === 'bridge_fund' ? 0n : quote.fee)) throw new Error('Bridge fee must be exactly 0.5%')
+    if (tx.fee !== quote.fee) throw new Error('Bridge fee must be exactly 0.5%')
     if (tx.sign?.owner !== tx.from || !crypto.verifyObj(tx)) throw new Error('Invalid bridge owner signature')
     if (tx.type === 'bridge_deposit') verifyDeposit(tx, config)
     if (
@@ -66,29 +67,18 @@ function checked(tx: any, states: any): any {
     )
       throw new Error('Valid public wallet required')
   }
-  if (
-    reserve?.id !== bridgeReserveAddress ||
-    reserve.type !== 'BridgeReserve' ||
-    typeof reserve.balance !== 'bigint' ||
-    reserve.balance < 0n ||
-    typeof reserve.funded !== 'bigint' ||
-    reserve.funded < reserve.balance
-  )
-    throw new Error('Invalid bridge reserve')
+  if (!reserve) throw new Error('Missing bridge supply ledger')
+  const supply = bridgeSupply(reserve, config)
   if (tx.nonce !== (sender.data.transferNonce ?? 0) + 1) throw new Error('Bridge payment nonce is out of sequence')
   const recordId = bridgeRecord(tx, config),
     record = states[recordId]?.data
-  if (tx.type !== 'bridge_fund' && (record?.type !== 'BridgeRecord' || record.id !== recordId || record.completed))
-    throw new Error('Bridge event already consumed or invalid')
+  if (record?.type !== 'BridgeRecord' || record.id !== recordId || record.completed) throw new Error('Bridge event already consumed or invalid')
   const quote = bridgeQuote(tx.amount, tx.type)
-  if (tx.type === 'bridge_deposit') {
-    if (reserve.balance < tx.amount) throw new Error('Insufficient native bridge liquidity')
-  } else {
+  if (tx.type === 'bridge_withdraw') {
     if (sender.data.balance < tx.amount + tx.fee) throw new Error('Insufficient native WIN including fee')
-    if (tx.type === 'bridge_fund' && reserve.funded + tx.amount > BigInt(config.reserveCapAtomic)) throw new Error('Native reserve funding cap exceeded')
-    if (tx.type === 'bridge_withdraw' && reserve.balance + tx.amount > reserve.funded) throw new Error('Insufficient unreserved BNB backing')
+    if (supply.minted - supply.burned < tx.amount) throw new Error('Insufficient outstanding BNB backing')
   }
-  return { config, sender, reserve, collector, recordId, quote }
+  return { config, sender, reserve, collector, recordId, quote, supply }
 }
 export function validate(tx: any, states: any, response: any): any {
   response.success = false
@@ -101,35 +91,42 @@ export function validate(tx: any, states: any, response: any): any {
   return response
 }
 export function apply(tx: any, now: number, txId: string, states: any, dapp: Shardus, response: ShardusTypes.ApplyResponse): void {
-  const { sender, reserve, collector, recordId, quote, config } = checked(tx, states)
-  if (tx.type === 'bridge_deposit') {
-    reserve.balance -= tx.amount
-    sender.data.balance += quote.receive
-  } else {
-    sender.data.balance -= tx.amount + tx.fee
-    reserve.balance += tx.amount
-    if (tx.type === 'bridge_fund') reserve.funded += tx.amount
-  }
+  const { sender, reserve, collector, recordId, quote, config, supply } = checked(tx, states)
+  const nativeMinted = tx.type === 'bridge_deposit' ? tx.amount : 0n
+  const nativeBurned = tx.type === 'bridge_withdraw' ? tx.amount : 0n
+  Object.assign(reserve, {
+    accounting: bridgeAccounting,
+    networkId: config.networkId,
+    vaultAddress: config.vaultAddress,
+    minted: supply.minted + nativeMinted,
+    burned: supply.burned + nativeBurned,
+  })
+  delete reserve.balance
+  delete reserve.funded
+  if (tx.type === 'bridge_deposit') sender.data.balance += quote.receive
+  else sender.data.balance -= tx.amount + tx.fee
   collector.data.balance += tx.fee
   sender.data.transferNonce = tx.nonce
   for (const account of [sender, reserve, collector]) account.timestamp = now
-  if (tx.type !== 'bridge_fund')
-    states[recordId].data = {
-      id: recordId,
-      type: 'BridgeRecord',
-      hash: '',
-      timestamp: now,
-      completed: true,
-      networkId: tx.networkId,
-      vaultAddress: config.vaultAddress,
-      operation: tx.type,
-      eventId: tx.id,
-      from: tx.from,
-      recipient: tx.recipient || tx.from,
-      amount: tx.amount,
-      fee: tx.fee,
-      txId,
-    }
+  states[recordId].data = {
+    id: recordId,
+    type: 'BridgeRecord',
+    hash: '',
+    timestamp: now,
+    completed: true,
+    accounting: bridgeAccounting,
+    nativeMinted,
+    nativeBurned,
+    networkId: tx.networkId,
+    vaultAddress: config.vaultAddress,
+    operation: tx.type,
+    eventId: tx.id,
+    from: tx.from,
+    recipient: tx.recipient || tx.from,
+    amount: tx.amount,
+    fee: tx.fee,
+    txId,
+  }
   const receipt: any = {
     networkId: tx.networkId,
     txId,
@@ -139,7 +136,7 @@ export function apply(tx: any, now: number, txId: string, states: any, dapp: Sha
     to: tx.to,
     transactionFee: tx.fee,
     success: true,
-    additionalInfo: { bridgeId: tx.id, recordId, amount: tx.amount },
+    additionalInfo: { bridgeId: tx.id, recordId, amount: tx.amount, accounting: bridgeAccounting, nativeMinted, nativeBurned },
   }
   dapp.applyResponseAddReceiptData(response, receipt, crypto.hashObj(receipt))
 }
@@ -160,7 +157,18 @@ export function memoryPattern(tx: any): any {
 export function createRelevantAccount(dapp: Shardus, account: any, accountId: string, tx: any, accountCreated = false): any {
   if (!keys(tx, {}).allKeys.includes(accountId)) throw new Error('Undeclared bridge account')
   if (!account) {
-    if (accountId === bridgeReserveAddress) account = { id: accountId, type: 'BridgeReserve', hash: '', timestamp: 0, balance: 0n, funded: 0n }
+    if (accountId === bridgeReserveAddress)
+      account = {
+        id: accountId,
+        type: 'BridgeReserve',
+        hash: '',
+        timestamp: 0,
+        accounting: bridgeAccounting,
+        networkId: WIN_NETWORK_ID,
+        vaultAddress: configuration().vaultAddress,
+        minted: 0n,
+        burned: 0n,
+      }
     else if (accountId === tx.from || accountId === formulas.feeRecipient) {
       if (accountId === tx.from && tx.type !== 'bridge_deposit') throw new Error('Sender must exist')
       account = userAccount(accountId, tx.timestamp)

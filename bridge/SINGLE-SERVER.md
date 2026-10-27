@@ -61,7 +61,7 @@ for port in 8081 8082 8083; do
 done
 ```
 
-All three health responses must show different `operator` addresses matching your deployed vault, the same vault/network, `nativeGatewayMode: "single"`, and `nativeGatewayQuorum: 1`. That quorum describes native gateway evidence; the contract signature requirement remains two of three.
+All three health responses must include `accounting: "deposit-backed-v1"` and show different `operator` addresses matching your deployed vault, the same vault/network, `nativeGatewayMode: "single"`, and `nativeGatewayQuorum: 1`. That quorum describes native gateway evidence; the contract signature requirement remains two of three.
 
 The services check the deployed vault on startup. A wrong key, wrong vault, wrong chain, invalid code hash or unavailable BNB RPC prevents successful startup. To inspect one service, use `pm2 logs win-bridge-operator-1 --lines 50` (Ctrl+C exits the log view). Use `pm2 restart /root/.config/win-bridge/ecosystem.config.cjs --update-env` after reviewed configuration changes.
 
@@ -117,4 +117,4 @@ Use these exact base URLs in every validator's bridge deployment `observerUrls`:
 
 [Caddy's `handle_path`](https://caddyserver.com/docs/caddyfile/directives/handle_path) removes the operator path prefix before forwarding. These are three different operator processes sharing a host, not independent native gateways.
 
-Running the services does not enable the bridge. Upgrade the native validators, configure the identical vault entry, fund the native reserve, and verify a controlled round trip before enabling public conversions, as described in [the deployment guide](README.md).
+Running the services does not enable the bridge. Upgrade the native validators and wallet to `deposit-backed-v1`, configure the identical vault entry, then enable and verify a controlled round trip before public use. No native reserve funding is needed. Follow the [existing-vault upgrade commands](DEPOSIT-BACKED-UPGRADE.md).

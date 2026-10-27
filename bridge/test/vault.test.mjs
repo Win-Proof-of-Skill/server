@@ -81,7 +81,7 @@ test('operator requires matching committed withdrawal and receipt from two trust
     networkId: c.networkId,
     vaultAddress: c.vaultAddress,
     eventId: id,
-    operation: 'bridge_withdraw',
+    operation: 'bridge_withdraw', accounting: 'deposit-backed-v1', nativeMinted: '0', nativeBurned: '100',
     from: 'f'.repeat(64),
     recipient: '0x' + 'e'.repeat(40),
     amount: '100',
@@ -93,7 +93,7 @@ test('operator requires matching committed withdrawal and receipt from two trust
     networkId: c.networkId,
     type: 'bridge_withdraw',
     from: record.from,
-    additionalInfo: { recordId: record.id, bridgeId: id },
+    additionalInfo: { recordId: record.id, bridgeId: id, accounting: 'deposit-backed-v1', nativeMinted: '0', nativeBurned: '100', amount: '100' },
   }
   const read = async (url) => (url.includes('/transaction/') ? { transaction: receipt } : { networkId: c.networkId, record })
   assert.equal((await withdrawalEvidence(c, id, read)).amount, '100')

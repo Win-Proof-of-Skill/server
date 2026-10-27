@@ -751,3 +751,20 @@ The transaction will:
 4. Update timestamps for both accounts
 
 Note: Penalty amounts are typically a percentage of staked amount, configured per violation type.
+
+
+## GET /bridge/v2/status (deposit-backed wallet bridge)
+
+This is the active wallet bridge endpoint; `/bridge/status` above is legacy diagnostics.
+The deployment must explicitly set `accounting: "deposit-backed-v1"`. The response includes
+`protocol:2`, `configured`, `enabled`, `operational`, pinned vault/operator identity,
+`requiresNativePrefunding:false`, and decimal atomic strings `nativeMinted`, `nativeBurned`,
+`nativeOutstanding` and `backedWithdrawalCapacity`. The last two are both minted minus burned,
+not a live measurement of the vault's BNB balance. Zero initial issuance is valid. A pending
+BNB release has already reduced native supply. Configuration flags do not measure operator
+or BNB RPC uptime. An invalid, used legacy or cross-deployment ledger returns HTTP 503.
+
+`/bridge/v2/records/:kind/:id` returns the committed replay record, including `accounting`,
+`nativeMinted` and `nativeBurned` as decimal atomic strings. Operators require a matching
+successful native receipt proving the same principal was burned before signing a release.
+`bridge_fund` is retired. See [deployment](../bridge/DEPOSIT-BACKED-UPGRADE.md).

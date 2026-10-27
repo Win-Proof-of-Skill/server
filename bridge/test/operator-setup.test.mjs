@@ -144,6 +144,7 @@ test('three running operators report distinct identities and the explicit single
     const response = await fetch(`http://127.0.0.1:${server.address().port}/health`)
     assert.equal(response.headers.get('access-control-allow-origin'), 'https://wallet.win-pskill.com')
     const health = await response.json()
+    assert.equal(health.accounting, 'deposit-backed-v1')
     assert.equal(health.nativeGatewayMode, 'single')
     assert.equal(health.nativeGatewayQuorum, 1)
     assert.equal(health.vaultAddress, deployed.vaultAddress)

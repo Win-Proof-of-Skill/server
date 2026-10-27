@@ -3,8 +3,9 @@ import settings from './bridge-v2.json'
 import { WIN_BSC_TOKEN } from './bridgeConfig'
 import { formulas } from './formulas'
 
+export const bridgeAccounting = 'deposit-backed-v1'
 export const bridgeReserveAddress = '6' + '0'.repeat(63)
-export const bridgeTypes = ['bridge_deposit', 'bridge_withdraw', 'bridge_fund']
+export const bridgeTypes = ['bridge_deposit', 'bridge_withdraw']
 export const bridgeDomain = (networkId: string, vault: string) => ({
   name: 'WINBridge',
   version: '1',
@@ -31,6 +32,7 @@ export function reserveBridge(networkId: string, raw: any = settings): any {
   const entry = raw.deployments?.[networkId]
   const base = {
     protocol: 2,
+    accounting: bridgeAccounting,
     networkId,
     referenceToken: WIN_BSC_TOKEN,
     reserveAddress: bridgeReserveAddress,
@@ -40,6 +42,8 @@ export function reserveBridge(networkId: string, raw: any = settings): any {
     threshold: 2,
   }
   if (!entry) return { ...base, configured: false, enabled: false, operators: [], observerUrls: [] }
+  if (entry.accounting !== bridgeAccounting || entry.reserveCapAtomic !== undefined)
+    throw new Error('Configure deposit-backed bridge accounting; legacy reserve configuration is not supported')
   const address = (v: string) => {
     const a = getAddress(v).toLowerCase()
     if (/^0x[0-6]0{39}$/.test(a) || a === WIN_BSC_TOKEN.address) throw new Error('Invalid bridge address')
@@ -49,7 +53,6 @@ export function reserveBridge(networkId: string, raw: any = settings): any {
   const vaultAddress = address(entry.vaultAddress)
   if (operators?.length !== 3 || new Set(operators).size !== 3 || operators.includes(vaultAddress)) throw new Error('Three distinct bridge operators required')
   if (!/^0x[0-9a-f]{64}$/.test(entry.vaultCodeHash)) throw new Error('Pinned vault runtime code hash required')
-  if (!/^[1-9][0-9]*$/.test(entry.reserveCapAtomic) || BigInt(entry.reserveCapAtomic) > 10n ** 27n) throw new Error('Invalid native reserve cap')
   if (!Array.isArray(entry.observerUrls) || entry.observerUrls.length !== 3) throw new Error('Three observer endpoints required')
   const observerUrls = entry.observerUrls.map((v: string) => {
     const u = new URL(v)
@@ -71,7 +74,6 @@ export function reserveBridge(networkId: string, raw: any = settings): any {
     vaultAddress,
     operators,
     observerUrls,
-    reserveCapAtomic: entry.reserveCapAtomic,
     vaultCodeHash: entry.vaultCodeHash,
   }
 }

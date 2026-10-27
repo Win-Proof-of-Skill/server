@@ -1,6 +1,6 @@
 import { WIN_NETWORK_ID, networkAccount } from '../config'
 import { reserveBridge, bridgeReserveAddress } from '../config/reserveBridge'
-import { bridgeRecordId } from '../domain/reserveBridge'
+import { bridgeRecordId, bridgeSupply } from '../domain/reserveBridge'
 
 export const reserveBridgeStatus =
   (dapp) =>
@@ -10,22 +10,16 @@ export const reserveBridgeStatus =
       const network = (await dapp.getLocalOrRemoteAccount(networkAccount))?.data
       if (network?.networkId !== WIN_NETWORK_ID) throw new Error('WIN network unavailable')
       const reserve = (await dapp.getLocalOrRemoteAccount(bridgeReserveAddress))?.data
-      if (
-        reserve &&
-        (reserve.id !== bridgeReserveAddress ||
-          reserve.type !== 'BridgeReserve' ||
-          typeof reserve.balance !== 'bigint' ||
-          reserve.balance < 0n ||
-          typeof reserve.funded !== 'bigint' ||
-          reserve.funded < reserve.balance)
-      )
-        throw new Error('Invalid reserve account')
+      const supply = bridgeSupply(reserve, config)
       res.json({
         ...config,
-        nativeLiquidity: reserve?.balance?.toString() || '0',
-        backedWithdrawalCapacity: reserve ? (reserve.funded - reserve.balance).toString() : '0',
+        nativeMinted: supply.minted.toString(),
+        nativeBurned: supply.burned.toString(),
+        nativeOutstanding: (supply.minted - supply.burned).toString(),
+        backedWithdrawalCapacity: (supply.minted - supply.burned).toString(),
+        requiresNativePrefunding: false,
         operational: config.configured && config.enabled,
-        missing: config.configured ? [] : ['deployed_vault', 'three_independent_operators', 'observer_endpoints', 'funded_liquidity'],
+        missing: config.configured ? [] : ['deployed_vault', 'three_operators', 'observer_endpoints'],
       })
     } catch (error) {
       res.status(503).json({ error: error.message })
@@ -48,7 +42,16 @@ export const reserveBridgeRecord =
       const record = (await dapp.getLocalOrRemoteAccount(id, { useRICache: false, canThrowException: true }))?.data
       res.json({
         networkId: WIN_NETWORK_ID,
-        record: record?.type === 'BridgeRecord' && record.completed ? { ...record, amount: record.amount.toString(), fee: record.fee.toString() } : null,
+        record:
+          record?.type === 'BridgeRecord' && record.completed
+            ? {
+                ...record,
+                amount: record.amount.toString(),
+                fee: record.fee.toString(),
+                nativeMinted: record.nativeMinted?.toString(),
+                nativeBurned: record.nativeBurned?.toString(),
+              }
+            : null,
       })
     } catch (error) {
       res.status(503).json({ error: 'Unable to read bridge record' })

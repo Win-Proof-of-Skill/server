@@ -1,5 +1,5 @@
 import { keccak256, toUtf8Bytes, verifyTypedData } from 'ethers'
-import { bridgeDomain, depositTypes, bridgeReserveAddress } from '../config/reserveBridge'
+import { bridgeDomain, depositTypes, bridgeReserveAddress, bridgeAccounting } from '../config/reserveBridge'
 import { transferFee } from '../config/formulas'
 
 export const bridgeRecordId = (networkId: string, vault: string, kind: string, id: string): string =>
@@ -19,5 +19,31 @@ export function verifyDeposit(tx: any, config: any): void {
   if (new Set(recovered).size !== 2 || recovered.some((a) => !config.operators.includes(a))) throw new Error('Invalid deposit quorum')
 }
 export function bridgeRecord(tx: any, config: any): string {
-  return tx.type === 'bridge_fund' ? bridgeReserveAddress : bridgeRecordId(tx.networkId, config.vaultAddress, tx.type, tx.id)
+  return bridgeRecordId(tx.networkId, config.vaultAddress, tx.type, tx.id)
+}
+
+// The protected account is now a supply ledger, not a wallet holding native coins.
+// Read-only validation: a failed transaction must not initialize or change state.
+export function bridgeSupply(account: any, config: any): { minted: bigint; burned: bigint } {
+  if (!account) return { minted: 0n, burned: 0n }
+  if (account.id !== bridgeReserveAddress || account.type !== 'BridgeReserve') throw new Error('Invalid bridge supply ledger')
+  if (account.accounting === undefined) {
+    if (account.balance === 0n && account.funded === 0n && account.timestamp === 0 && account.minted === undefined && account.burned === undefined)
+      return { minted: 0n, burned: 0n }
+    throw new Error('Legacy bridge reserve has activity; an explicit migration is required')
+  }
+  if (
+    account.accounting !== bridgeAccounting ||
+    account.networkId !== config.networkId ||
+    account.vaultAddress !== config.vaultAddress ||
+    typeof account.minted !== 'bigint' ||
+    typeof account.burned !== 'bigint' ||
+    account.minted < 0n ||
+    account.burned < 0n ||
+    account.burned > account.minted ||
+    (account.balance !== undefined && account.balance !== 0n) ||
+    (account.funded !== undefined && account.funded !== 0n)
+  )
+    throw new Error('Invalid bridge supply ledger')
+  return { minted: account.minted, burned: account.burned }
 }

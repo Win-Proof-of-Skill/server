@@ -2,6 +2,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { JsonRpcProvider, Contract, Wallet, keccak256, FetchRequest } from 'ethers'
+export const ACCOUNTING = 'deposit-backed-v1'
 export const ABI = [
   'function token() view returns(address)',
   'function networkId() view returns(bytes32)',
@@ -70,13 +71,24 @@ export function nativeGatewayPolicy(c) {
   if (!Array.isArray(c.nativeGateways) || c.nativeGateways.length !== expected) throw new Error(countError)
   const gateways = c.nativeGateways.map((value) => {
     const u = new URL(value)
-    if (u.username || u.password || u.search || u.hash ||
-      !(u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))))
+    if (
+      u.username ||
+      u.password ||
+      u.search ||
+      u.hash ||
+      !(u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)))
+    )
       throw new Error('Secure trusted native gateways required')
     return u.toString().replace(/\/$/, '')
   })
   if (new Set(gateways).size !== expected) throw new Error(countError)
   return { mode, gateways, threshold: mode === 'single' ? 1 : 2 }
+}
+// Native receipts use Shardus bigint wire objects; records expose decimal strings.
+function atomic(value) {
+  if (typeof value === 'string' && /^(0|[1-9][0-9]{0,81})$/.test(value)) return value
+  if (value?.dataType === 'bi' && typeof value.value === 'string' && /^[a-f0-9]{1,68}$/i.test(value.value)) return BigInt('0x' + value.value).toString()
+  return null
 }
 export async function withdrawalEvidence(c, id, reader = read) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid native withdrawal ID')
@@ -93,6 +105,9 @@ export async function withdrawalEvidence(c, id, reader = read) {
         r.vaultAddress !== c.vaultAddress ||
         r.eventId !== id ||
         r.operation !== 'bridge_withdraw' ||
+        r.accounting !== ACCOUNTING ||
+        r.nativeBurned !== r.amount ||
+        r.nativeMinted !== '0' ||
         !/^[1-9][0-9]*$/.test(r.amount)
       )
         throw new Error('Withdrawal not committed')
@@ -105,7 +120,11 @@ export async function withdrawalEvidence(c, id, reader = read) {
         receipt.type !== 'bridge_withdraw' ||
         receipt.from !== r.from ||
         receipt.additionalInfo?.recordId !== r.id ||
-        receipt.additionalInfo?.bridgeId !== id
+        receipt.additionalInfo?.bridgeId !== id ||
+        receipt.additionalInfo?.accounting !== ACCOUNTING ||
+        atomic(receipt.additionalInfo?.nativeBurned) !== r.amount ||
+        atomic(receipt.additionalInfo?.nativeMinted) !== '0' ||
+        atomic(receipt.additionalInfo?.amount) !== r.amount
       )
         throw new Error('Missing committed withdrawal receipt')
       return { id: '0x' + id, recipient: r.recipient, amount: r.amount }
@@ -118,9 +137,12 @@ export async function withdrawalEvidence(c, id, reader = read) {
       counts.set(key, (counts.get(key) || 0) + 1)
     }
   const agreement = [...counts].find(([, count]) => count >= policy.threshold)
-  if (!agreement) throw new Error(policy.mode === 'single'
-    ? 'Trusted native gateway must confirm the committed withdrawal and successful receipt'
-    : 'Two trusted native gateways must agree on the committed withdrawal')
+  if (!agreement)
+    throw new Error(
+      policy.mode === 'single'
+        ? 'Trusted native gateway must confirm the committed withdrawal and successful receipt'
+        : 'Two trusted native gateways must agree on the committed withdrawal',
+    )
   return JSON.parse(agreement[0])
 }
 export function loadConfig(file) {
@@ -160,8 +182,7 @@ export function validateConfig(c) {
 }
 export function readOperatorKey(file) {
   const stat = fs.lstatSync(file)
-  if (!stat.isFile() || (process.platform !== 'win32' && (stat.mode & 0o077)))
-    throw new Error('Operator key must be a private regular file (chmod 600)')
+  if (!stat.isFile() || (process.platform !== 'win32' && stat.mode & 0o077)) throw new Error('Operator key must be a private regular file (chmod 600)')
   let key
   try {
     key = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -175,11 +196,8 @@ export function readOperatorKey(file) {
 }
 export async function serve() {
   const c = loadConfig(process.env.WIN_BRIDGE_CONFIG)
-  if (process.env.WIN_BRIDGE_KEY_FILE && process.env.WIN_BRIDGE_OPERATOR_KEY)
-    throw new Error('Set only WIN_BRIDGE_KEY_FILE or WIN_BRIDGE_OPERATOR_KEY')
-  const signer = process.env.WIN_BRIDGE_KEY_FILE
-    ? readOperatorKey(process.env.WIN_BRIDGE_KEY_FILE)
-    : new Wallet(process.env.WIN_BRIDGE_OPERATOR_KEY)
+  if (process.env.WIN_BRIDGE_KEY_FILE && process.env.WIN_BRIDGE_OPERATOR_KEY) throw new Error('Set only WIN_BRIDGE_KEY_FILE or WIN_BRIDGE_OPERATOR_KEY')
+  const signer = process.env.WIN_BRIDGE_KEY_FILE ? readOperatorKey(process.env.WIN_BRIDGE_KEY_FILE) : new Wallet(process.env.WIN_BRIDGE_OPERATOR_KEY)
   if (!c.operators.includes(signer.address.toLowerCase())) throw new Error('Key is not a configured operator')
   const policy = nativeGatewayPolicy(c)
   if (policy.mode === 'single') console.warn('Single gateway mode: withdrawal evidence trusts one native gateway. Two operator signatures are still required.')
@@ -199,7 +217,16 @@ export async function serve() {
     }
     if (req.method === 'GET' && req.url === '/health') {
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ networkId: c.networkId, vaultAddress: c.vaultAddress, operator: signer.address.toLowerCase(), nativeGatewayMode: policy.mode, nativeGatewayQuorum: policy.threshold }))
+      res.end(
+        JSON.stringify({
+          accounting: ACCOUNTING,
+          networkId: c.networkId,
+          vaultAddress: c.vaultAddress,
+          operator: signer.address.toLowerCase(),
+          nativeGatewayMode: policy.mode,
+          nativeGatewayQuorum: policy.threshold,
+        }),
+      )
       return
     }
     if (req.method !== 'POST' || !['/deposit', '/withdraw'].includes(req.url)) {
@@ -236,4 +263,13 @@ export async function serve() {
   server.listen(Number(process.env.PORT || 8081), '127.0.0.1', () => console.log('WIN bridge operator listening on loopback'))
   return server
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await serve()
+// PM2 imports ESM through its launcher; argv[1] then points to that launcher.
+const entryPoint = process.env.pm_exec_path || process.argv[1]
+if (entryPoint && import.meta.url === pathToFileURL(entryPoint).href) {
+  try {
+    await serve()
+  } catch (error) {
+    console.error('WIN bridge operator failed to start:', error.message)
+    process.exit(1)
+  }
+}
