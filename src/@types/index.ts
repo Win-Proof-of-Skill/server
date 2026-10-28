@@ -417,7 +417,7 @@ export interface Signature {
 }
 
 export enum TollUnit {
-  win= 'WIN',
+  win = 'WIN',
   usd = 'USD',
 }
 
@@ -752,13 +752,7 @@ export interface DaoProposalAccount {
   timestamp: number
 }
 
-export type Accounts = NetworkAccount &
-  UserAccount &
-  AliasAccount &
-  NodeAccount &
-  ChatAccount &
-  DaoProposalsMeta &
-  DaoProposalAccount
+export type Accounts = NetworkAccount & UserAccount & AliasAccount & NodeAccount & ChatAccount & DaoProposalsMeta & DaoProposalAccount
 
 export type AccountVariant =
   | NetworkAccount
@@ -777,17 +771,16 @@ export type AccountVariant =
  */
 
 export interface NetworkParameters {
-
   title: string
   description: string
-  maxSupply: bigint,
-  maxTransactionBytes: number,
-  maxParties: number,
-  maxSkills: number,
-  maxEvidence: number,
-  maxClockSkewMs: number,
-  contractApprovalWindowMs: number,
-  joinProofLifetimeMs: number,
+  maxSupply: bigint
+  maxTransactionBytes: number
+  maxParties: number
+  maxSkills: number
+  maxEvidence: number
+  maxClockSkewMs: number
+  contractApprovalWindowMs: number
+  joinProofLifetimeMs: number
   nodeRewardInterval: number
   maintenanceInterval: number
   maintenanceFee: bigint
@@ -865,10 +858,7 @@ export type KeyResult = {
 }
 
 export interface GlobalMessage extends Omit<P2P.GlobalAccountsTypes.SetGlobalTx, 'txId'> {
-  value:
-    | Tx.InitNetwork
-    | Tx.ApplyChangeConfig
-    | Tx.ApplyChangeNetworkParam
+  value: Tx.InitNetwork | Tx.ApplyChangeConfig | Tx.ApplyChangeNetworkParam
 }
 
 export interface OurAppDefinedData {
@@ -983,7 +973,6 @@ export interface GoldenTicketRequest {
   sign: Signature
 }
 
-
 export interface EditableObjectMetadata {
   id: string
   owner: string
@@ -998,6 +987,8 @@ export type ContractWorkStatus = 'planned' | 'active' | 'completed' | 'canceled'
 export type ContractApprovalStatus = 'not_requested' | 'pending' | 'approved' | 'rejected' | 'expired'
 
 export interface ContractContent {
+  // Absent on legacy records; clients display those as employee contracts.
+  contractType?: 'employee' | 'student' | 'internship'
   origin: 'new' | 'historical'
   title: string
   publicDescription: string
@@ -1058,17 +1049,10 @@ export interface Endorsement extends EditableObjectMetadata {
   subjectProfileId: string
   skillId: string
 
-  relationship:
-    | 'employer'
-    | 'colleague'
-    | 'client'
-    | 'teacher'
-    | 'mentor'
-    | 'collaborator'
-    | 'other'
+  relationship: 'employer' | 'colleague' | 'client' | 'teacher' | 'mentor' | 'collaborator' | 'other'
 
   statement: string
-  contractId?: string          // Optional supporting work contract
+  contractId?: string // Optional supporting work contract
 
   evidence: {
     id: string
@@ -1097,18 +1081,12 @@ export interface ProfileLink {
 }
 
 export interface DateRange {
-  startDate: string       // YYYY or YYYY-MM
-  endDate?: string        // Omit while ongoing
+  startDate: string // YYYY or YYYY-MM
+  endDate?: string // Omit while ongoing
   current?: boolean
 }
 
-export type ProfileType =
-  | 'person'
-  | 'organization'
-  | 'government'
-  | 'company'
-  | 'university'
-  | 'school'
+export type ProfileType = 'person' | 'organization' | 'government' | 'company' | 'university' | 'school'
 
 export interface ProfileCommon extends EditableObjectMetadata {
   displayName: string
@@ -1125,9 +1103,8 @@ export interface ProfileCommon extends EditableObjectMetadata {
       region?: string
       countryCode?: string // ISO two-letter code, e.g. TN
     }
-    links?: ProfileLink[]  // LinkedIn, GitHub, portfolio, etc.
+    links?: ProfileLink[] // LinkedIn, GitHub, portfolio, etc.
   }
-
 }
 
 export interface EntityDetails {
@@ -1161,23 +1138,25 @@ export interface SchoolDetails extends EntityDetails {
   accreditations?: string[]
   curriculum?: string
 }
-export type Profile = ProfileCommon & (
-  | { type: 'person'; details: PersonDetails }
-  | { type: 'organization'; details: OrganizationDetails }
-  | { type: 'government'; details: GovernmentDetails }
-  | { type: 'company'; details: CompanyDetails }
-  | { type: 'university'; details: UniversityDetails }
-  | { type: 'school'; details: SchoolDetails }
-)
+export type Profile = ProfileCommon &
+  (
+    | { type: 'person'; details: PersonDetails }
+    | { type: 'organization'; details: OrganizationDetails }
+    | { type: 'government'; details: GovernmentDetails }
+    | { type: 'company'; details: CompanyDetails }
+    | { type: 'university'; details: UniversityDetails }
+    | { type: 'school'; details: SchoolDetails }
+  )
 
-export type ProfileContent = Pick<ProfileCommon, 'displayName' | 'summary' | 'avatarUrl' | 'coverImageUrl' | 'contact'> & (
-  | { type: 'person'; details: PersonDetails }
-  | { type: 'organization'; details: OrganizationDetails }
-  | { type: 'government'; details: GovernmentDetails }
-  | { type: 'company'; details: CompanyDetails }
-  | { type: 'university'; details: UniversityDetails }
-  | { type: 'school'; details: SchoolDetails }
-)
+export type ProfileContent = Pick<ProfileCommon, 'displayName' | 'summary' | 'avatarUrl' | 'coverImageUrl' | 'contact'> &
+  (
+    | { type: 'person'; details: PersonDetails }
+    | { type: 'organization'; details: OrganizationDetails }
+    | { type: 'government'; details: GovernmentDetails }
+    | { type: 'company'; details: CompanyDetails }
+    | { type: 'university'; details: UniversityDetails }
+    | { type: 'school'; details: SchoolDetails }
+  )
 
 export type SkillContent = Pick<Skill, 'name' | 'description' | 'category' | 'kind'>
 export type EndorsementContent = Pick<Endorsement, 'endorserProfileId' | 'subjectProfileId' | 'skillId' | 'relationship' | 'statement' | 'durationMonths'>
@@ -1199,11 +1178,11 @@ export interface ProofOfSkillTx extends BaseWinTx {
 export interface PersonDetails {
   firstName?: string
   lastName?: string
-  headline?: string       // Example: "Full-stack developer"
+  headline?: string // Example: "Full-stack developer"
 
   // Skills claimed by the profile owner
   skills?: {
-    skillId: string       // Reference to the protected skills account
+    skillId: string // Reference to the protected skills account
     yearsOfExperience?: number
     selfAssessedLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert'
     evidenceIds?: string[]
@@ -1215,14 +1194,7 @@ export interface PersonDetails {
     jobTitle: string
     organization: string
     organizationUrl?: string
-    employmentType?:
-      | 'full_time'
-      | 'part_time'
-      | 'contract'
-      | 'freelance'
-      | 'internship'
-      | 'apprenticeship'
-      | 'self_employed'
+    employmentType?: 'full_time' | 'part_time' | 'contract' | 'freelance' | 'internship' | 'apprenticeship' | 'self_employed'
     location?: string
     workMode?: 'onsite' | 'remote' | 'hybrid'
     description?: string
@@ -1272,18 +1244,13 @@ export interface PersonDetails {
     achievements?: string[]
     skillIds?: string[]
     contractIds?: string[]
-    links?: ProfileLink[]  // Demo, repository, case study, etc.
+    links?: ProfileLink[] // Demo, repository, case study, etc.
   })[]
 
   // Spoken and written languages
   languages?: {
-    languageCode: string  // Example: ar, fr, en
-    proficiency:
-      | 'elementary'
-      | 'limited_working'
-      | 'professional_working'
-      | 'full_professional'
-      | 'native_or_bilingual'
+    languageCode: string // Example: ar, fr, en
+    proficiency: 'elementary' | 'limited_working' | 'professional_working' | 'full_professional' | 'native_or_bilingual'
     cefrLevel?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
     certificationId?: string
   }[]
@@ -1382,13 +1349,12 @@ export interface PersonDetails {
   }
 }
 
-
 export interface Skill extends EditableObjectMetadata {
   id: string
   name: string
   description: string
 
-  category: string             // Example: "Software development"
+  category: string // Example: "Software development"
   kind: 'technical' | 'interpersonal' | 'language' | 'other'
 
   aliases: string[]
@@ -1438,9 +1404,4 @@ export interface SkillsAccount extends RegistryAccountBase {
   skills: Record<string, Skill>
 }
 
-export type ProofOfSkillAccount =
-  | ProfilesAccount
-  | ContractsAccount
-  | EndorsementsAccount
-  | ScoresAccount
-  | SkillsAccount
+export type ProofOfSkillAccount = ProfilesAccount | ContractsAccount | EndorsementsAccount | ScoresAccount | SkillsAccount

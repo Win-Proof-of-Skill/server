@@ -262,7 +262,10 @@ test('handler approval atomically changes the contract and score registries and 
   const wallet = userAccount(employer, now)
   wallet.data.balance = 3n * formulas.contractFee
   const wrapped = Object.fromEntries(
-    [userAccount(formulas.feeRecipient, now), wallet, ...Object.values(state)].map((data) => [data.id, { data, accountId: data.id, timestamp: data.timestamp, stateId: data.hash }]),
+    [userAccount(formulas.feeRecipient, now), wallet, ...Object.values(state)].map((data) => [
+      data.id,
+      { data, accountId: data.id, timestamp: data.timestamp, stateId: data.hash },
+    ]),
   )
   const signature = jest.spyOn(crypto, 'verifyObj').mockReturnValue(true)
   try {
@@ -276,4 +279,36 @@ test('handler approval atomically changes the contract and score registries and 
   } finally {
     signature.mockRestore()
   }
+})
+
+test.each(['employee', 'internship'] as const)('stores %s contracts and binds the type to signed terms', (contractType) => {
+  run(tx(TXTypes.contract, id(3), 'create', 0, { ...content(), contractType }))
+  expect(contract().contractType).toBe(contractType)
+  request()
+  const oldHash = contract().termsHash
+  run(tx(TXTypes.contract, id(3), 'update', contract().revision, { ...content(), contractType: contractType === 'employee' ? 'internship' : 'employee' }))
+  expect(contract().termsHash).not.toBe(oldHash)
+  expect(contract().approvalStatus).toBe('not_requested')
+  expect(contract().approvalRequest).toBeUndefined()
+})
+test.each(['university', 'school'])('student contracts accept %s institutions and support approval', (type) => {
+  run(tx(TXTypes.profile, id(4), 'create', 0, { type, displayName: 'Institution', details: { legalName: 'Institution' } }, employer))
+  run(tx(TXTypes.contract, id(3), 'create', 0, { ...content(), contractType: 'student', hiringProfileIds: [id(4)] }))
+  request()
+  approve(id(4))
+  expect(contract().contractType).toBe('student')
+  expect(contract().approvalStatus).toBe('approved')
+})
+test('student contract validation cannot be bypassed with a company, mixed institutions or an update', () => {
+  run(tx(TXTypes.profile, id(4), 'create', 0, { type: 'school', displayName: 'School', details: { legalName: 'School' } }, employer))
+  for (const hiringProfileIds of [[id(2)], [id(4), id(2)]]) {
+    expect(() => run(tx(TXTypes.contract, id(3), 'create', 0, { ...content(), contractType: 'student', hiringProfileIds }))).toThrow('university or school')
+  }
+  run(tx(TXTypes.contract, id(3), 'create', 0, content()))
+  expect(() => run(tx(TXTypes.contract, id(3), 'update', 1, { ...content(), contractType: 'student' }))).toThrow('university or school')
+  expect(contract().contractType).toBeUndefined()
+})
+test('legacy contracts remain valid and unknown contract types are rejected', () => {
+  expect(validateProofOfSkillShape(tx(TXTypes.contract, id(3), 'create', 0, content()))).toBeUndefined()
+  expect(validateProofOfSkillShape(tx(TXTypes.contract, id(3), 'create', 0, { ...content(), contractType: 'other' }))).toBeDefined()
 })

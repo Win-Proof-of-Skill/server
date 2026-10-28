@@ -78,9 +78,24 @@ export function applyDomainAction(tx: ProofOfSkillTx, state: DomainState, now: n
     const name = content.name.trim().normalize('NFKC')
     ensure(name.length > 0, 'Skill name is required')
     ensure(tx.action === 'create' && tx.expectedRevision === 0 && !own(state.skills.skills, tx.objectId), 'Skill revision conflict')
-    ensure(!Object.values(state.skills.skills).some(s => s.name.normalize('NFKC').toLowerCase() === name.toLowerCase()), 'Skill already exists; select it from the directory')
-    state.skills.skills[tx.objectId] = { ...content, name, id: tx.objectId, owner: tx.from, managers: [], schemaVersion: 1,
-      revision: 1, createdAt: now, updatedAt: now, aliases: [], relatedSkillIds: [], assessmentCriteria: [] }
+    ensure(
+      !Object.values(state.skills.skills).some((s) => s.name.normalize('NFKC').toLowerCase() === name.toLowerCase()),
+      'Skill already exists; select it from the directory',
+    )
+    state.skills.skills[tx.objectId] = {
+      ...content,
+      name,
+      id: tx.objectId,
+      owner: tx.from,
+      managers: [],
+      schemaVersion: 1,
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+      aliases: [],
+      relatedSkillIds: [],
+      assessmentCriteria: [],
+    }
     bump(state.skills, now)
     return
   }
@@ -92,24 +107,52 @@ export function applyDomainAction(tx: ProofOfSkillTx, state: DomainState, now: n
       ensure(previous && previous.revision === tx.expectedRevision, 'Endorsement revision conflict')
       ensure(controls(getProfile(state, previous.endorserProfileId), tx.from), 'Only the endorsing profile controller can revoke')
       ensure(previous.status === 'active', 'Endorsement is already revoked')
-      previous.status = 'revoked'; previous.revokedAt = now; previous.revocationReason = tx.reason
-      previous.updatedAt = now; previous.revision += 1
+      previous.status = 'revoked'
+      previous.revokedAt = now
+      previous.revocationReason = tx.reason
+      previous.updatedAt = now
+      previous.revision += 1
     } else {
       ensure(tx.action === 'create' && !previous && tx.expectedRevision === 0, 'Endorsement revision conflict')
       const content = tx.payload as EndorsementContent
       const source = getProfile(state, content.endorserProfileId)
       const target = getProfile(state, content.subjectProfileId)
       ensure(controls(source, tx.from), 'Only the endorsing profile controller may sign')
-      ensure(source.id !== target.id && !controls(target, tx.from) && !controls(target, source.owner) && !controls(source, target.owner), 'Self endorsements are not allowed')
+      ensure(
+        source.id !== target.id && !controls(target, tx.from) && !controls(target, source.owner) && !controls(source, target.owner),
+        'Self endorsements are not allowed',
+      )
       ensure(own(state.skills.skills, content.skillId), 'Skill does not exist')
-      ensure(target.type === 'person' && target.details.skills?.some(s => s.skillId === content.skillId), 'Subject must claim the endorsed skill')
+      ensure(target.type === 'person' && target.details.skills?.some((s) => s.skillId === content.skillId), 'Subject must claim the endorsed skill')
       ensure(content.statement.trim().length > 0, 'Endorsement statement is required')
-      ensure(!Object.values(records).some(e => e.endorserProfileId === source.id && e.subjectProfileId === target.id && e.skillId === content.skillId && e.status === 'active' && e.validUntil > now), 'An active endorsement already exists')
+      ensure(
+        !Object.values(records).some(
+          (e) =>
+            e.endorserProfileId === source.id &&
+            e.subjectProfileId === target.id &&
+            e.skillId === content.skillId &&
+            e.status === 'active' &&
+            e.validUntil > now,
+        ),
+        'An active endorsement already exists',
+      )
       // Skill attestations are visible evidence. Only the established contract-outcome
       // protocol changes aggregate scores; endorsements cannot mint arbitrary score.
-      records[tx.objectId] = { ...content, id: tx.objectId, owner: source.owner, managers: [], schemaVersion: 1,
-        revision: 1, createdAt: now, updatedAt: now, evidence: [], validFrom: now,
-        validUntil: addMonths(now, content.durationMonths), status: 'active', scoring: 0 }
+      records[tx.objectId] = {
+        ...content,
+        id: tx.objectId,
+        owner: source.owner,
+        managers: [],
+        schemaVersion: 1,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+        evidence: [],
+        validFrom: now,
+        validUntil: addMonths(now, content.durationMonths),
+        status: 'active',
+        scoring: 0,
+      }
     }
     bump(state.endorsements, now)
     return
@@ -162,6 +205,10 @@ export function applyDomainAction(tx: ProofOfSkillTx, state: DomainState, now: n
     ensure(!existing || (existing.workerProfileId === content.workerProfileId && existing.origin === content.origin), 'Worker and origin are immutable')
     for (const id of content.hiringProfileIds) {
       const hiring = getProfile(state, id)
+      ensure(
+        content.contractType !== 'student' || ['university', 'school'].includes(hiring.type),
+        'Student contracts require a university or school for every hiring profile',
+      )
       ensure(!controls(hiring, worker.owner), 'Worker cannot approve its own hiring relationship')
     }
     for (const id of content.skillIds) ensure(own(state.skills.skills, id), `Skill ${id} does not exist`)

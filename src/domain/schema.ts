@@ -170,6 +170,7 @@ export const profileContentSchema = {
 }
 export const contractContentSchema = object(
   {
+    contractType: enumeration('employee', 'student', 'internship'),
     origin: enumeration('new', 'historical'),
     title: { ...short, minLength: 1 },
     publicDescription: text,
@@ -241,19 +242,38 @@ for (const action of ['request_approval', 'approve', 'reject', 'expire']) {
     ]),
   )
 }
-const endorsementContent = object({
-  endorserProfileId: id, subjectProfileId: id, skillId: id,
-  relationship: enumeration('employer', 'colleague', 'client', 'teacher', 'mentor', 'collaborator', 'other'),
-  statement: { ...text, minLength: 1 }, durationMonths: { type: 'integer', minimum: 1, maximum: 12 },
-}, ['endorserProfileId', 'subjectProfileId', 'skillId', 'relationship', 'statement', 'durationMonths'])
-const skillContent = object({ name: { ...short, minLength: 1 }, description: text, category: short,
-  kind: enumeration('technical', 'interpersonal', 'language', 'other') }, ['name', 'description', 'category', 'kind'])
-for (const [type, to, payload] of [['endorsement', endorsementsAddress, endorsementContent], ['skill', skillsAddress, skillContent]] as const) {
-  variants.push(object({ ...common, type: { const: type }, to: { const: to }, action: { const: 'create' }, payload },
-    [...required, 'type', 'to', 'action', 'payload']))
+const endorsementContent = object(
+  {
+    endorserProfileId: id,
+    subjectProfileId: id,
+    skillId: id,
+    relationship: enumeration('employer', 'colleague', 'client', 'teacher', 'mentor', 'collaborator', 'other'),
+    statement: { ...text, minLength: 1 },
+    durationMonths: { type: 'integer', minimum: 1, maximum: 12 },
+  },
+  ['endorserProfileId', 'subjectProfileId', 'skillId', 'relationship', 'statement', 'durationMonths'],
+)
+const skillContent = object(
+  { name: { ...short, minLength: 1 }, description: text, category: short, kind: enumeration('technical', 'interpersonal', 'language', 'other') },
+  ['name', 'description', 'category', 'kind'],
+)
+for (const [type, to, payload] of [
+  ['endorsement', endorsementsAddress, endorsementContent],
+  ['skill', skillsAddress, skillContent],
+] as const) {
+  variants.push(
+    object({ ...common, type: { const: type }, to: { const: to }, action: { const: 'create' }, payload }, [...required, 'type', 'to', 'action', 'payload']),
+  )
 }
-variants.push(object({ ...common, type: { const: 'endorsement' }, to: { const: endorsementsAddress }, action: { const: 'revoke' }, reason: { ...text, minLength: 1 } },
-  [...required, 'type', 'to', 'action', 'reason']))
+variants.push(
+  object({ ...common, type: { const: 'endorsement' }, to: { const: endorsementsAddress }, action: { const: 'revoke' }, reason: { ...text, minLength: 1 } }, [
+    ...required,
+    'type',
+    'to',
+    'action',
+    'reason',
+  ]),
+)
 export const proofOfSkillSchema = { oneOf: variants }
 const ajv = new Ajv({ allErrors: false })
 ajv.addKeyword('isBigInt', { validate: (_schema: boolean, value: unknown) => typeof value === 'bigint' && value >= 0n, errors: false })
