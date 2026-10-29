@@ -1,5 +1,5 @@
 import Ajv from 'ajv'
-import { contractsAddress, profilesAddress, endorsementsAddress, skillsAddress } from '../config'
+import { connectionsAddress, contractsAddress, profilesAddress, endorsementsAddress, skillsAddress } from '../config'
 
 const text = { type: 'string', maxLength: 4000 }
 const short = { type: 'string', maxLength: 250 }
@@ -274,6 +274,10 @@ variants.push(
     'reason',
   ]),
 )
+variants.push(object({ ...common, type: { const: 'connection' }, to: { const: connectionsAddress }, action: { const: 'create' },
+  payload: object({ fromProfileId: id, toProfileId: id }, ['fromProfileId', 'toProfileId']) }, [...required, 'type', 'to', 'action', 'payload']))
+for (const action of ['accept', 'decline', 'cancel', 'remove'])
+  variants.push(object({ ...common, type: { const: 'connection' }, to: { const: connectionsAddress }, action: { const: action } }, [...required, 'type', 'to', 'action']))
 export const proofOfSkillSchema = { oneOf: variants }
 const ajv = new Ajv({ allErrors: false })
 ajv.addKeyword('isBigInt', { validate: (_schema: boolean, value: unknown) => typeof value === 'bigint' && value >= 0n, errors: false })

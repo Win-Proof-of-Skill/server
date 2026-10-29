@@ -32,6 +32,7 @@ export enum AJVSchemaEnum {
   contract = 'contract',
   endorsement = 'endorsement',
   skill = 'skill',
+  connection = 'connection',
   message = 'message',
   read = 'read',
   reclaim_toll = 'reclaim_toll',
@@ -82,6 +83,7 @@ export enum TXTypes {
   contract = 'contract',
   endorsement = 'endorsement',
   skill = 'skill',
+  connection = 'connection',
   message = 'message',
   read = 'read',
   reclaim_toll = 'reclaim_toll',
@@ -1162,14 +1164,14 @@ export type SkillContent = Pick<Skill, 'name' | 'description' | 'category' | 'ki
 export type EndorsementContent = Pick<Endorsement, 'endorserProfileId' | 'subjectProfileId' | 'skillId' | 'relationship' | 'statement' | 'durationMonths'>
 
 export interface ProofOfSkillTx extends BaseWinTx {
-  type: TXTypes.profile | TXTypes.contract | TXTypes.endorsement | TXTypes.skill
+  type: TXTypes.profile | TXTypes.contract | TXTypes.endorsement | TXTypes.skill | TXTypes.connection
   from: string
   to: string
   objectId: string
   expectedRevision: number
   fee: bigint
-  action: 'create' | 'update' | 'request_approval' | 'approve' | 'reject' | 'expire' | 'revoke'
-  payload?: ProfileContent | ContractContent | EndorsementContent | SkillContent
+  action: 'create' | 'update' | 'request_approval' | 'approve' | 'reject' | 'expire' | 'revoke' | 'accept' | 'decline' | 'cancel' | 'remove'
+  payload?: ProfileContent | ContractContent | EndorsementContent | SkillContent | ConnectionContent
   requestHash?: string
   hiringProfileId?: string
   reason?: string
@@ -1404,4 +1406,19 @@ export interface SkillsAccount extends RegistryAccountBase {
   skills: Record<string, Skill>
 }
 
-export type ProofOfSkillAccount = ProfilesAccount | ContractsAccount | EndorsementsAccount | ScoresAccount | SkillsAccount
+export interface ConnectionContent { fromProfileId: string; toProfileId: string }
+export interface Connection extends ConnectionContent {
+  id: string
+  status: 'pending' | 'accepted' | 'declined' | 'canceled' | 'removed'
+  revision: number
+  schemaVersion: 1
+  createdAt: number
+  updatedAt: number
+  requestedBy: string
+  acceptedBy?: string
+}
+export interface ConnectionsAccount extends RegistryAccountBase {
+  type: 'ConnectionsAccount'
+  connections: Record<string, Connection>
+}
+export type ProofOfSkillAccount = ProfilesAccount | ContractsAccount | EndorsementsAccount | ScoresAccount | SkillsAccount | ConnectionsAccount

@@ -1,7 +1,8 @@
+import { connectionsAccount } from '../../accounts/connection'
 import { Shardus, ShardusTypes } from '@shardus/core'
 import { Utils } from '@shardus/lib-types'
-import type { ProofOfSkillTx, WrappedStates, UserAccount, AppReceiptData, ProfilesAccount, ContractsAccount, ScoresAccount, SkillsAccount, EndorsementsAccount } from '../../@types'
-import { profilesAddress, contractsAddress, scoresAddress, skillsAddress, endorsementsAddress, isProtectedAddress, WIN_NETWORK_ID } from '../../config'
+import type { ProofOfSkillTx, WrappedStates, UserAccount, AppReceiptData, ProfilesAccount, ContractsAccount, ScoresAccount, SkillsAccount, EndorsementsAccount, ConnectionsAccount } from '../../@types'
+import { connectionsAddress, profilesAddress, contractsAddress, scoresAddress, skillsAddress, endorsementsAddress, isProtectedAddress, WIN_NETWORK_ID } from '../../config'
 import { formulas, transactionFee } from '../../config/formulas'
 import * as crypto from '../../crypto'
 import { validateProofOfSkillShape } from '../../domain/schema'
@@ -13,8 +14,9 @@ import { skillsAccount } from '../../accounts/skill'
 import { userAccount } from '../../accounts/userAccount'
 import { endorsementsAccount } from '../../accounts/endorsement'
 
-const factories = { [profilesAddress]: profilesAccount, [contractsAddress]: contractsAccount, [scoresAddress]: scoresAccount, [skillsAddress]: skillsAccount, [endorsementsAddress]: endorsementsAccount }
+const factories = { [connectionsAddress]: connectionsAccount, [profilesAddress]: profilesAccount, [contractsAddress]: contractsAccount, [scoresAddress]: scoresAccount, [skillsAddress]: skillsAccount, [endorsementsAddress]: endorsementsAccount }
 const registryTypes = {
+  [connectionsAddress]: 'ConnectionsAccount',
   [profilesAddress]: 'ProfilesAccount',
   [contractsAddress]: 'ContractsAccount',
   [scoresAddress]: 'ScoresAccount',
@@ -56,10 +58,11 @@ function draft(tx: ProofOfSkillTx, states: WrappedStates, now: number, txId: str
     return clone(data) as unknown as T
   }
   const state: DomainState = {
+    ...(tx.type === 'connection' ? { connections: read<ConnectionsAccount>(connectionsAddress) } : {}),
     profiles: read<ProfilesAccount>(profilesAddress),
     scores: read<ScoresAccount>(scoresAddress),
     ...(tx.type === 'contract' ? { contracts: read<ContractsAccount>(contractsAddress) } : {}),
-    ...(tx.type !== 'profile' ? { skills: read<SkillsAccount>(skillsAddress) } : {}),
+    ...(tx.type !== 'profile' && tx.type !== 'connection' ? { skills: read<SkillsAccount>(skillsAddress) } : {}),
     ...(tx.type === 'endorsement' ? { endorsements: read<EndorsementsAccount>(endorsementsAddress) } : {}),
   }
   applyDomainAction(tx, state, now, txId)
@@ -116,15 +119,15 @@ export function createFailedAppReceiptData(
 }
 export function keys(tx: ProofOfSkillTx, result: ShardusTypes.TransactionKeys): ShardusTypes.TransactionKeys {
   result.sourceKeys = [tx.from]
-  result.targetKeys = tx.type === 'profile' ? [profilesAddress, scoresAddress] : tx.type === 'contract' ? [profilesAddress, contractsAddress, scoresAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress, endorsementsAddress] : [profilesAddress, scoresAddress, skillsAddress]
+  result.targetKeys = tx.type === 'connection' ? [profilesAddress, scoresAddress, connectionsAddress] : tx.type === 'profile' ? [profilesAddress, scoresAddress] : tx.type === 'contract' ? [profilesAddress, contractsAddress, scoresAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress, endorsementsAddress] : [profilesAddress, scoresAddress, skillsAddress]
   result.targetKeys = [...new Set([...result.targetKeys, formulas.feeRecipient])].filter(id => !result.sourceKeys.includes(id))
   result.allKeys = [...result.sourceKeys, ...result.targetKeys]
   return result
 }
 export function memoryPattern(tx: ProofOfSkillTx): ShardusTypes.ShardusMemoryPatternsInput {
   return {
-    rw: tx.type === 'profile' ? [...new Set([tx.from, profilesAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'contract' ? [...new Set([tx.from, contractsAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'endorsement' ? [...new Set([tx.from, endorsementsAddress, formulas.feeRecipient])] : [...new Set([tx.from, skillsAddress, formulas.feeRecipient])],
-    ro: tx.type === 'contract' ? [profilesAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress] : tx.type === 'skill' ? [profilesAddress, scoresAddress] : [],
+    rw: tx.type === 'connection' ? [...new Set([tx.from, connectionsAddress, formulas.feeRecipient])] : tx.type === 'profile' ? [...new Set([tx.from, profilesAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'contract' ? [...new Set([tx.from, contractsAddress, scoresAddress, formulas.feeRecipient])] : tx.type === 'endorsement' ? [...new Set([tx.from, endorsementsAddress, formulas.feeRecipient])] : [...new Set([tx.from, skillsAddress, formulas.feeRecipient])],
+    ro: tx.type === 'connection' ? [profilesAddress, scoresAddress] : tx.type === 'contract' ? [profilesAddress, skillsAddress] : tx.type === 'endorsement' ? [profilesAddress, scoresAddress, skillsAddress] : tx.type === 'skill' ? [profilesAddress, scoresAddress] : [],
     wo: [],
     on: [],
     ri: [],

@@ -1,3 +1,4 @@
+import { connectionsAccount } from './connection'
 import { aliasAccount, deserializeAliasAccount, serializeAliasAccount } from './aliasAccount'
 import { devAccount, deserializeDevAccount, serializeDevAccount } from './devAccount'
 import { chatAccount, deserializeChatAccount, serializeChatAccount } from './chatAccount'
@@ -113,6 +114,7 @@ export const fallbackDeserializer = (stream: VectorBufferStream, root = false): 
 }
 
 export default {
+  connectionsAccount,
   profilesAccount,
   contractsAccount,
   endorsementsAccount,

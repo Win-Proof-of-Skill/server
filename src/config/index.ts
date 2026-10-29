@@ -30,6 +30,7 @@ export const contractsAddress = '2' + '0'.repeat(63)
 export const endorsementsAddress = '3' + '0'.repeat(63)
 export const scoresAddress = '4' + '0'.repeat(63)
 export const skillsAddress = '5' + '0'.repeat(63)
+export const connectionsAddress = '7' + '0'.repeat(63)
 
 export const proofOfSkillAddresses = Object.freeze({
   profiles: profilesAddress,
@@ -37,6 +38,7 @@ export const proofOfSkillAddresses = Object.freeze({
   endorsements: endorsementsAddress,
   scores: scoresAddress,
   skills: skillsAddress,
+  connections: connectionsAddress,
 })
 
 const protectedAddressSet = new Set<string>(

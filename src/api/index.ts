@@ -1,3 +1,4 @@
+import { connectionQuery } from './connections'
 import { paymentMessages } from './payments'
 import { reserveBridgeStatus, reserveBridgeRecord } from './reserveBridge'
 import { proofOfSkillRecord, proofOfSkillDirectory } from './proofOfSkill'
@@ -15,6 +16,7 @@ import dao from './dao'
 import { Shardus } from '@shardus/core'
 export default (dapp: Shardus): void => {
   dapp.registerExternalPost('inject', inject(dapp))
+  dapp.registerExternalPost('connections/query', connectionQuery(dapp))
   dapp.registerExternalGet('profiles/:id', proofOfSkillRecord(dapp, 'profiles'))
   dapp.registerExternalGet('contracts/:id', proofOfSkillRecord(dapp, 'contracts'))
   dapp.registerExternalGet('scores/:id', proofOfSkillRecord(dapp, 'scores'))

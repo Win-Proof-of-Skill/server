@@ -1,4 +1,6 @@
 import type {
+  ConnectionContent,
+  ConnectionsAccount,
   Contract,
   ContractContent,
   Profile,
@@ -19,6 +21,7 @@ import { addMonths } from '../config/time'
 import { WIN_NETWORK_ID, INITIAL_PARAMETERS } from '../config'
 
 export interface DomainState {
+  connections?: ConnectionsAccount
   profiles: ProfilesAccount
   contracts?: ContractsAccount
   scores: ScoresAccount
@@ -62,7 +65,7 @@ function validateContract(content: ContractContent, now: number): void {
 function hashTerms(content: ContractContent, termsRevision: number): string {
   return crypto.hashObj({ domain: 'WIN.contract.terms.v1', termsRevision, content })
 }
-function bump(account: ProfilesAccount | ContractsAccount | ScoresAccount | SkillsAccount | EndorsementsAccount, now: number): void {
+function bump(account: ConnectionsAccount | ProfilesAccount | ContractsAccount | ScoresAccount | SkillsAccount | EndorsementsAccount, now: number): void {
   ensure(Number.isSafeInteger(account.revision + 1), 'Registry revision exhausted')
   account.revision += 1
   account.timestamp = now
@@ -72,6 +75,45 @@ function bump(account: ProfilesAccount | ContractsAccount | ScoresAccount | Skil
 export function applyDomainAction(tx: ProofOfSkillTx, state: DomainState, now: number, txId: string): void {
   ensure(Number.isSafeInteger(now) && now > 0, 'Invalid consensus timestamp')
   ensure(tx.networkId === WIN_NETWORK_ID, 'Wrong WIN network')
+  if (tx.type === 'connection') {
+    const registry = state.connections
+    ensure(registry, 'Connections registry is missing')
+    const existing = own(registry.connections, tx.objectId) ? registry.connections[tx.objectId] : undefined
+    if (tx.action === 'create') {
+      const content = tx.payload as ConnectionContent
+      ensure(!existing && tx.expectedRevision === 0, 'Connection ID already exists')
+      const source = getProfile(state, content.fromProfileId), target = getProfile(state, content.toProfileId)
+      ensure(source.id !== target.id, 'A profile cannot connect to itself')
+      ensure(controls(source, tx.from), 'Only the requesting profile controller can send this request')
+      const pair = Object.values(registry.connections).filter(c =>
+        (c.fromProfileId === source.id && c.toProfileId === target.id) || (c.fromProfileId === target.id && c.toProfileId === source.id))
+      ensure(!pair.some(c => c.status === 'pending' || c.status === 'accepted'), 'This profile pair already has a pending or accepted connection')
+      ensure(!pair.some(c => c.status === 'declined' && c.fromProfileId === source.id && now - c.updatedAt < 86400000), 'Wait 24 hours after a declined request')
+      for (const profile of [source, target]) ensure(Object.values(registry.connections).filter(c => c.status === 'pending' && (c.fromProfileId === profile.id || c.toProfileId === profile.id)).length < 100, 'Profile has too many pending requests')
+      registry.connections[tx.objectId] = { ...content, id: tx.objectId, status: 'pending', revision: 1, schemaVersion: 1, createdAt: now, updatedAt: now, requestedBy: tx.from }
+    } else {
+      ensure(existing && existing.revision === tx.expectedRevision, 'Connection changed; refresh before continuing')
+      const source = getProfile(state, existing.fromProfileId), target = getProfile(state, existing.toProfileId)
+      if (tx.action === 'accept' || tx.action === 'decline') {
+        ensure(existing.status === 'pending' && controls(target, tx.from), 'Only the receiving profile controller can accept or decline')
+        if (tx.action === 'accept') {
+          for (const profile of [source, target]) ensure(Object.values(registry.connections).filter(c => c.status === 'accepted' && (c.fromProfileId === profile.id || c.toProfileId === profile.id)).length < 500, 'Profile has reached the 500-connection limit')
+          existing.acceptedBy = tx.from
+        }
+        existing.status = tx.action === 'accept' ? 'accepted' : 'declined'
+      } else if (tx.action === 'cancel') {
+        ensure(existing.status === 'pending' && controls(source, tx.from), 'Only the requesting profile controller can cancel')
+        existing.status = 'canceled'
+      } else {
+        ensure(tx.action === 'remove' && existing.status === 'accepted' && (controls(source, tx.from) || controls(target, tx.from)), 'Only connected profile controllers can remove a connection')
+        existing.status = 'removed'
+      }
+      ensure(Number.isSafeInteger(existing.revision + 1), 'Connection revision exhausted')
+      existing.revision++; existing.updatedAt = now
+    }
+    bump(registry, now)
+    return
+  }
   if (tx.type === 'skill') {
     ensure(state.skills, 'Skill registry is missing')
     const content = tx.payload as SkillContent

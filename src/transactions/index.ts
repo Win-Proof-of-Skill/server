@@ -43,6 +43,7 @@ export default {
   bridge_deposit: bridge,
   bridge_withdraw: bridge,
   bridge_fund: bridge,
+  connection: proofOfSkill,
   profile: proofOfSkill,
   contract: proofOfSkill,
   endorsement: proofOfSkill,
